@@ -3,6 +3,7 @@ pub enum Element {
     Text(String),
     Variable(String),
     Include(String),
+    Template(Vec<Element>),
     TemplateStart(String),
     TemplateEnd
 }
@@ -29,11 +30,7 @@ impl Element {
             if let Some((start, end)) = Self::find_next_element(text) {
                 println!("Element found: {}, {} - {}", start, end, &text[start..end]);
                 if let Some(element) = Self::parse_element(&text[start..end]) {
-                    if let Element::TemplateEnd = element {
-                        elements.append(&mut Self::parse_elements(&text[..start]));
-                    } else {
-                        elements.push(Element::Text(text[..start].to_owned()));
-                    }
+                    elements.push(Element::Text(text[..start].to_owned()));
                     elements.push(element);
                 } else {
                     elements.push(Element::Text(text[..end].to_owned()));
@@ -62,7 +59,7 @@ impl Element {
 
         if text.starts_with('@') {
             return Self::parse_command(&text[1..]);
-        } else if (text.starts_with('$')) {
+        } else if text.starts_with('$') {
             return Some(Element::Variable(text[1..].to_owned()));
         }
 
