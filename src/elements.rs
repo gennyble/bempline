@@ -3,19 +3,10 @@ pub enum Element {
     Text(String),
     Variable(String),
     Include(String),
-    Template(Vec<Element>),
+    Template(String, Vec<Element>),
     TemplateStart(String),
     TemplateEnd
 }
-
-/*
-Read after every space until we have {~
-then there should be a space
-everything until the next ~} is to be interpreted
-`@words` is a command
-commands can have arguments
-`$words` is a variable
-*/
 
 impl Element {
     pub fn parse_elements(text: &str) -> Vec<Element> {
@@ -28,12 +19,33 @@ impl Element {
             }
 
             if let Some((start, end)) = Self::find_next_element(text) {
-                println!("Element found: {}, {} - {}", start, end, &text[start..end]);
                 if let Some(element) = Self::parse_element(&text[start..end]) {
-                    elements.push(Element::Text(text[..start].to_owned()));
-                    elements.push(element);
+                    if !text[..start].is_empty() {
+                        elements.push(Element::Text(text[..start].to_owned()));
+                    }
+
+                    if let Element::TemplateEnd = element {
+                        let mut tempvec: Vec<Element> = vec![];
+
+                        loop {
+                            //TODO: Handle error
+                            let elem = elements.pop().unwrap();
+
+                            if let Element::TemplateStart(name) = elem {
+                                tempvec.reverse();
+                                elements.push(Element::Template(name, tempvec));
+                                break;
+                            } else {
+                                tempvec.push(elem);
+                            }
+                        }
+                    } else {
+                        elements.push(element);
+                    }
                 } else {
-                    elements.push(Element::Text(text[..end].to_owned()));
+                    if !text[..end].is_empty() {
+                        elements.push(Element::Text(text[..end].to_owned()));
+                    }
                 }
 
                 text = &text[end..];
@@ -125,11 +137,11 @@ mod tests {
         let test_str = "Template test\n{~ @template listItem ~}\n<li>{~ $text ~}</li>\n{~ @end-template ~}";
         let cmp_vec = vec![
             Element::Text(String::from("Template test\n")),
-            Element::TemplateStart(String::from("listItem")),
-            Element::Text(String::from("\n<li>")),
-            Element::Variable(String::from("text")),
-            Element::Text(String::from("</li>\n")),
-            Element::TemplateEnd
+            Element::Template(String::from("listItem"), vec![
+                Element::Text(String::from("\n<li>")),
+                Element::Variable(String::from("text")),
+                Element::Text(String::from("</li>\n"))
+            ])
         ];
 
         let parsed = Element::parse_elements(&test_str);
