@@ -1,6 +1,7 @@
 use crate::elements::Element;
+use std::fs;
 
-struct Document {
+pub struct Document {
     elements: Vec<Element>
 }
 
@@ -11,33 +12,75 @@ impl Document {
         }
     }
 
-   /*pub fn set_variable(&mut self, key: &str, value: &str) -> usize {
-        /*
-        Replace all instances of Element::Variable(key) with
-            Element::Text(value).
-        Make sure to NOT replace anything in a template
-        return number of times it was replaced
-        */
+   pub fn set_variable(&mut self, key: &str, value: &str) -> usize {
+        let compare = |element: &Element| {
+            if let Element::Variable(varval) = element {
+                if varval == key {
+                    return true;
+                }
+            }
+
+            false
+        };
+
+        let mut variables_processed = 0;
+        loop {
+            if let Some(index) = self.elements.iter().position(compare) {
+                self.elements.remove(index);
+                self.elements.insert(index, Element::Text(value.to_owned()));
+                variables_processed += 1;
+            } else {
+                return variables_processed;
+            }
+        }
     }
 
-    /*pub fn process_includes(&mut self) -> Result<Error, usize>{
-        /*
-        @START
-        Use binary_search to find an include, any include.
-        Get the include from the vector
-        Get the file the include points to
-        Element::parse_elements on the contents of the file
-        Insert contents directly before the include
-        remove the include
-        @goto start while no more includes
-        */
+    pub fn process_includes(&mut self) -> Result<usize, ()>{
+        let compare = |element: &Element| {
+            if let Element::Include(filename) = element {
+                true
+            } else {
+                false
+            }
+        };
+
+        let mut includes_processed = 0;
+        loop {
+            if let Some(index) = self.elements.iter().position(compare) {
+                let filename = if let Element::Include(edata) = self.elements.get(index).unwrap() {
+                    edata
+                } else {
+                    panic!("How did bsearch find this?");
+                };
+
+                //TODO: Handle errors correctly
+                let contents = fs::read_to_string(filename).unwrap();
+                self.elements.remove(index);
+
+                let include_elements = Element::parse_elements(&contents);
+                for element in include_elements.into_iter().rev() {
+                    self.elements.insert(index, element);
+                }
+
+                includes_processed += 1;
+            } else {
+                return Ok(includes_processed);
+            }
+        }
     }
 
-    pub fn get_template(&self, name: &str) -> Result<Error, Document> {
+    /*pub fn get_template(&self, name: &str) -> Result<Error, Document> {
         /*
         Find the TemplateStart with the name `name`
         Work until the first TemplateEnd, tempaltes can't overlap
         Return these elements as a new document
+        */
+    }
+
+    pub fn set_template(&mut self, name: &str, template: Document) -> Result<Error, ()> {
+        /*
+        Find the template with this name
+        Insert all elements from `template` document before it
         */
     }
 
@@ -50,3 +93,110 @@ impl Document {
         */
     }*/
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_include() {
+        let test_str = "Test{~ $var ~}{~ @include test/testdoc ~}tesT";
+        let cmp_before_vec =[
+            Element::Text(String::from("Test")),
+            Element::Variable(String::from("var")),
+            Element::Include(String::from("test/testdoc")),
+            Element::Text(String::from("tesT"))
+        ];
+        let cmp_after_vec =[
+            Element::Text(String::from("Test")),
+            Element::Variable(String::from("var")),
+            Element::Text(String::from("Testdoc!")),
+            Element::Variable(String::from("var")),
+            Element::Text(String::from("\n")),
+            Element::Text(String::from("tesT"))
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_before_vec);
+
+        let includes = doc.process_includes().unwrap();
+        assert_eq!(1, includes);
+        assert_eq!(doc.elements, cmp_after_vec);
+    }
+
+    #[test]
+    fn test_nested_include() {
+        let test_str = "{~ @include test/testdoc_nested ~}";
+        let cmp_before_vec = [
+            Element::Include(String::from("test/testdoc_nested"))
+        ];
+        let cmp_after_vec = [
+            Element::Text(String::from("Testdoc!")), // From testdoc
+            Element::Variable(String::from("var")), // From testdoc
+            Element::Text(String::from("\n")), // From testdoc
+            Element::Text(String::from("\n")) // From testdoc_nested
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_before_vec);
+
+        let includes = doc.process_includes().unwrap();
+        assert_eq!(2, includes);
+        assert_eq!(doc.elements, cmp_after_vec);
+    }
+
+    #[test]
+    fn test_variables() {
+        let test_str = "Test!{~ $foo ~}";
+        let cmp_before_vec = vec![
+            Element::Text(String::from("Test!")),
+            Element::Variable(String::from("foo"))
+        ];
+        let cmp_after_vec = vec![
+            Element::Text(String::from("Test!")),
+            Element::Text(String::from("bar"))
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_before_vec);
+
+        let variables = doc.set_variable("foo", "bar");
+        assert_eq!(1, variables);
+        assert_eq!(doc.elements, cmp_after_vec);
+    }
+
+    #[test]
+    fn test_multivariables() {
+        let test_str = "Test!{~ $foo ~}{~ $foobar ~}{~ $foo ~}";
+        let cmp_before_vec = vec![
+            Element::Text(String::from("Test!")),
+            Element::Variable(String::from("foo")),
+            Element::Variable(String::from("foobar")),
+            Element::Variable(String::from("foo"))
+        ];
+        let cmp_after_foo_vec = vec![
+            Element::Text(String::from("Test!")),
+            Element::Text(String::from("bar")),
+            Element::Variable(String::from("foobar")),
+            Element::Text(String::from("bar"))
+        ];
+        let cmp_after_foobar_vec = vec![
+            Element::Text(String::from("Test!")),
+            Element::Text(String::from("bar")),
+            Element::Text(String::from("barfoo")),
+            Element::Text(String::from("bar"))
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_before_vec);
+
+        let variables = doc.set_variable("foo", "bar");
+        assert_eq!(2, variables);
+        assert_eq!(doc.elements, cmp_after_foo_vec);
+
+       let variables = doc.set_variable("foobar", "barfoo");
+        assert_eq!(1, variables);
+        assert_eq!(doc.elements, cmp_after_foobar_vec);
+    }
+}
+
