@@ -5,7 +5,7 @@ pub enum Element {
     Include(String),
     Pattern(String, Vec<Element>),
     PatternStart(String),
-    PatternEnd
+    PatternEnd,
 }
 
 impl Element {
@@ -64,7 +64,7 @@ impl Element {
             return None;
         }
 
-        let text = &text[3..text.len()-3];
+        let text = &text[3..text.len() - 3];
         if text.len() < 1 {
             return None;
         }
@@ -93,7 +93,7 @@ impl Element {
     fn find_next_element(text: &str) -> Option<(usize, usize)> {
         if let Some(start) = text.find("{~ ") {
             if let Some(end) = &text[start..].find(" ~}") {
-                return Some((start, start+end+3));
+                return Some((start, start + end + 3));
             }
         }
 
@@ -103,7 +103,7 @@ impl Element {
     pub fn string(self) -> String {
         match self {
             Element::Text(text) => text,
-            _ => String::new()
+            _ => String::new(),
         }
     }
 }
@@ -118,7 +118,7 @@ mod tests {
         let cmp_vec = vec![
             Element::Text(String::from("Test")),
             Element::Variable(String::from("test")),
-            Element::Text(String::from("!"))
+            Element::Text(String::from("!")),
         ];
 
         let parsed = Element::parse_elements(&test_str);
@@ -127,7 +127,8 @@ mod tests {
 
     #[test]
     fn test_parse_complex() {
-        let test_str = "This is a {~ $word ~} string! Did I spell it right? {~ @include dictionary.txt ~}";
+        let test_str =
+            "This is a {~ $word ~} string! Did I spell it right? {~ @include dictionary.txt ~}";
         let cmp_vec = vec![
             Element::Text(String::from("This is a ")),
             Element::Variable(String::from("word")),
@@ -141,14 +142,18 @@ mod tests {
 
     #[test]
     fn test_parse_pattern() {
-        let test_str = "Pattern test\n{~ @pattern listItem ~}\n<li>{~ $text ~}</li>\n{~ @end-pattern ~}";
+        let test_str =
+            "Pattern test\n{~ @pattern listItem ~}\n<li>{~ $text ~}</li>\n{~ @end-pattern ~}";
         let cmp_vec = vec![
             Element::Text(String::from("Pattern test\n")),
-            Element::Pattern(String::from("listItem"), vec![
-                Element::Text(String::from("\n<li>")),
-                Element::Variable(String::from("text")),
-                Element::Text(String::from("</li>\n"))
-            ])
+            Element::Pattern(
+                String::from("listItem"),
+                vec![
+                    Element::Text(String::from("\n<li>")),
+                    Element::Variable(String::from("text")),
+                    Element::Text(String::from("</li>\n")),
+                ],
+            ),
         ];
 
         let parsed = Element::parse_elements(&test_str);
