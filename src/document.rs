@@ -69,18 +69,18 @@ impl Document {
         }
     }
 
-    /*pub fn get_template(&self, name: &str) -> Result<Error, Document> {
+    /*pub fn get_pattern(&self, name: &str) -> Result<Error, Document> {
         /*
-        Find the TemplateStart with the name `name`
-        Work until the first TemplateEnd, tempaltes can't overlap
+        Find the PatternStart with the name `name`
+        Work until the first PatternEnd, tempaltes can't overlap
         Return these elements as a new document
         */
     }
 
-    pub fn set_template(&mut self, name: &str, template: Document) -> Result<Error, ()> {
+    pub fn set_pattern(&mut self, name: &str, pattern: Document) -> Result<Error, ()> {
         /*
-        Find the template with this name
-        Insert all elements from `template` document before it
+        Find the pattern with this name
+        Insert all elements from `pattern` document before it
         */
     }
 
@@ -88,7 +88,7 @@ impl Document {
         /*
         Maybe this would be better as like IntoString
         make sure to remove anything that isn't Text
-        also remove everything in between and including templates
+        also remove everything in between and including patterns
         cat all the Element::Text-s together
         */
     }*/
