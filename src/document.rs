@@ -47,7 +47,7 @@ impl Document {
         let mut includes_processed = 0;
         loop {
             if let Some(index) = self.elements.iter().position(compare) {
-                let filename = if let Element::Include(edata) = self.elements.get(index).unwrap() {
+               let filename = if let Element::Include(edata) = self.elements.get(index).unwrap() {
                     edata
                 } else {
                     panic!("How did bsearch find this?");
@@ -69,22 +69,46 @@ impl Document {
         }
     }
 
-    /*pub fn get_pattern(&self, name: &str) -> Result<Error, Document> {
-        /*
-        Find the PatternStart with the name `name`
-        Work until the first PatternEnd, tempaltes can't overlap
-        Return these elements as a new document
-        */
+    pub fn get_pattern(&self, name: &str) -> Result<Document, ()> {
+        let compare = |element: &&Element| {
+            match element {
+                Element::Pattern(pname, elements) if pname == name => true,
+                _ => false
+            }
+        };
+
+        if let Some(pattern) = self.elements.iter().find(compare) {
+            if let Element::Pattern(name, elements) = pattern {
+                return Ok(Document{elements: elements.to_vec()});
+            }
+        }
+
+        Err(())
     }
 
-    pub fn set_pattern(&mut self, name: &str, pattern: Document) -> Result<Error, ()> {
-        /*
-        Find the pattern with this name
-        Insert all elements from `pattern` document before it
-        */
+    pub fn set_pattern(&mut self, name: &str, pattern: Document) -> Result<usize, ()> {
+        let compare = |element: &Element| {
+            match element {
+                Element::Pattern(pname, _) if pname == name => true,
+                _ => false
+            }
+        };
+
+        if let Some(index) = self.elements.iter().position(compare) {
+
+            let mut elements_inserted = 0;
+            for element in pattern.elements.into_iter().rev() {
+                self.elements.insert(index, element);
+                elements_inserted += 1;
+            }
+
+            return Ok(elements_inserted);
+        }
+
+        Err(())
     }
 
-    pub fn as_string() -> String {
+    /*pub fn as_string() -> String {
         /*
         Maybe this would be better as like IntoString
         make sure to remove anything that isn't Text
@@ -197,6 +221,76 @@ mod tests {
        let variables = doc.set_variable("foobar", "barfoo");
         assert_eq!(1, variables);
         assert_eq!(doc.elements, cmp_after_foobar_vec);
+    }
+
+    #[test]
+    fn test_get_pattern() {
+        let test_str = "Test{~ @pattern pat ~}{~ $var ~}{~ @end-pattern ~}";
+        let cmp_pat_vec = vec![
+            Element::Variable(String::from("var"))
+        ];
+        let cmp_vec = vec![
+            Element::Text(String::from("Test")),
+            Element::Pattern(String::from("pat"), vec![
+                Element::Variable(String::from("var"))
+            ])
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_vec);
+
+        let pattern = doc.get_pattern("pat").unwrap();
+        assert_eq!(pattern.elements, cmp_pat_vec);
+    }
+
+    #[test]
+    fn test_set_pattern() {
+        let test_str = "Test!{~ @pattern pat ~}{~ $var ~}{~ @end-pattern ~}!tesT";
+        let cmp_pat_vec = vec![
+            Element::Variable(String::from("var"))
+        ];
+        let cmp_vec_0 = vec![
+            Element::Text(String::from("Test!")),
+            Element::Pattern(String::from("pat"), vec![
+                Element::Variable(String::from("var"))
+            ]),
+            Element::Text(String::from("!tesT"))
+        ];
+        let cmp_vec_1 = vec![
+            Element::Text(String::from("Test!")),
+            Element::Variable(String::from("var")),
+            Element::Pattern(String::from("pat"), vec![
+                Element::Variable(String::from("var"))
+            ]),
+            Element::Text(String::from("!tesT"))
+        ];
+        let cmp_vec_2 = vec![
+            Element::Text(String::from("Test!")),
+            Element::Variable(String::from("var")),
+            Element::Text(String::from("rav")),
+            Element::Pattern(String::from("pat"), vec![
+                Element::Variable(String::from("var"))
+            ]),
+            Element::Text(String::from("!tesT"))
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_vec_0);
+
+        let mut pat = doc.get_pattern("pat").unwrap();
+        assert_eq!(pat.elements, cmp_pat_vec);
+
+        doc.set_pattern("pat", pat);
+        assert_eq!(doc.elements, cmp_vec_1);
+
+        let mut pat = doc.get_pattern("pat").unwrap();
+        assert_eq!(pat.elements, cmp_pat_vec);
+
+        let variables = pat.set_variable("var", "rav");
+        assert_eq!(1, variables);
+
+        doc.set_pattern("pat", pat);
+        assert_eq!(doc.elements, cmp_vec_2);
     }
 }
 
