@@ -29,11 +29,11 @@ Sincerely,
 Coorp.
 ```
 
-#### List Creation
+#### Patterns
 ```
-{~ @template post ~}
+{~ @pattern post ~}
 <div class="post">
 	<h1>{~ $title ~}</h1>
 	<p>{~ $summary ~}</p>
 </div>
-{~ @end-template ~}
+{~ @end-pattern ~}
