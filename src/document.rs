@@ -108,14 +108,15 @@ impl Document {
         Err(())
     }
 
-    /*pub fn as_string() -> String {
-        /*
-        Maybe this would be better as like IntoString
-        make sure to remove anything that isn't Text
-        also remove everything in between and including patterns
-        cat all the Element::Text-s together
-        */
-    }*/
+    pub fn as_string(self) -> String {
+        let mut string = String::new();
+
+        for element in self.elements {
+            string.push_str(&element.string());
+        }
+
+        string
+    }
 }
 
 #[cfg(test)]
@@ -291,6 +292,19 @@ mod tests {
 
         doc.set_pattern("pat", pat);
         assert_eq!(doc.elements, cmp_vec_2);
+    }
+
+    #[test]
+    fn test_to_string() {
+        let test_str = "Hello, my name is {~ $name ~}!\nIncluding testdoc:\n\t{~ @include test/testdoc ~}";
+        let cmp_str = "Hello, my name is genbyte!\nIncluding testdoc:\n\tTestdoc! Variable replaced.\n";
+
+        let mut doc = Document::new(test_str);
+        doc.process_includes();
+        doc.set_variable("name", "genbyte");
+        doc.set_variable("var", " Variable replaced.");
+
+        assert_eq!(doc.as_string(), cmp_str);
     }
 }
 
