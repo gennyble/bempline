@@ -3,9 +3,9 @@ pub enum Element {
     Text(String),
     Variable(String),
     Include(String),
-    Template(String, Vec<Element>),
-    TemplateStart(String),
-    TemplateEnd
+    Pattern(String, Vec<Element>),
+    PatternStart(String),
+    PatternEnd
 }
 
 impl Element {
@@ -24,16 +24,16 @@ impl Element {
                         elements.push(Element::Text(text[..start].to_owned()));
                     }
 
-                    if let Element::TemplateEnd = element {
+                    if let Element::PatternEnd = element {
                         let mut tempvec: Vec<Element> = vec![];
 
                         loop {
                             //TODO: Handle error
                             let elem = elements.pop().unwrap();
 
-                            if let Element::TemplateStart(name) = elem {
+                            if let Element::PatternStart(name) = elem {
                                 tempvec.reverse();
-                                elements.push(Element::Template(name, tempvec));
+                                elements.push(Element::Pattern(name, tempvec));
                                 break;
                             } else {
                                 tempvec.push(elem);
@@ -81,10 +81,10 @@ impl Element {
     fn parse_command(text: &str) -> Option<Element> {
         if text.starts_with("include ") {
             return Some(Element::Include(text[8..].to_owned()));
-        } else if text.starts_with("template ") {
-            return Some(Element::TemplateStart(text[9..].to_owned()));
-        } else if text == "end-template" {
-            return Some(Element::TemplateEnd);
+        } else if text.starts_with("pattern ") {
+            return Some(Element::PatternStart(text[8..].to_owned()));
+        } else if text == "end-pattern" {
+            return Some(Element::PatternEnd);
         }
 
         None
@@ -133,11 +133,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_template() {
-        let test_str = "Template test\n{~ @template listItem ~}\n<li>{~ $text ~}</li>\n{~ @end-template ~}";
+    fn test_parse_pattern() {
+        let test_str = "Pattern test\n{~ @pattern listItem ~}\n<li>{~ $text ~}</li>\n{~ @end-pattern ~}";
         let cmp_vec = vec![
-            Element::Text(String::from("Template test\n")),
-            Element::Template(String::from("listItem"), vec![
+            Element::Text(String::from("Pattern test\n")),
+            Element::Pattern(String::from("listItem"), vec![
                 Element::Text(String::from("\n<li>")),
                 Element::Variable(String::from("text")),
                 Element::Text(String::from("</li>\n"))
