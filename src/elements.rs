@@ -99,6 +99,13 @@ impl Element {
 
         None
     }
+
+    pub fn string(self) -> String {
+        match self {
+            Element::Text(text) => text,
+            _ => String::new()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -146,5 +153,18 @@ mod tests {
 
         let parsed = Element::parse_elements(&test_str);
         assert_eq!(parsed, cmp_vec);
+    }
+
+    #[test]
+    fn test_to_string() {
+        let text = Element::Text(String::from("TextTest"));
+        let variable = Element::Variable(String::from("VariableTest"));
+        let include = Element::Include(String::from("IncludeTest"));
+        let pattern = Element::Pattern(String::from("PatternTest"), vec![]);
+
+        assert_eq!(text.string(), "TextTest");
+        assert_eq!(variable.string(), "");
+        assert_eq!(include.string(), "");
+        assert_eq!(pattern.string(), "");
     }
 }
