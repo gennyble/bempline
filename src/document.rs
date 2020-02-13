@@ -1,4 +1,5 @@
 use crate::elements::Element;
+use crate::error::Error;
 use std::fs;
 
 pub struct Document {
@@ -12,6 +13,20 @@ impl Document {
         }
     }
 
+    /// Returns a usize indicating how many variables were replaced
+    ///
+    /// Replace every instance of variable `key` with text `value`
+    ///
+    /// # Example
+    /// ```rust
+    /// use bempline::Document;
+    ///
+    /// let mut doc = Document::new("Hello, {~ $noun ~}!");
+    /// let num_replaced = doc.set_variable("noun", "World");
+    ///
+    /// assert_eq!(num_replaced, 1);
+    /// assert_eq!(doc.as_string(), "Hello, World!");
+    /// ```
     pub fn set_variable(&mut self, key: &str, value: &str) -> usize {
         let compare = |element: &Element| match element {
             Element::Variable(vkey) if vkey == key => true,
@@ -30,7 +45,18 @@ impl Document {
         }
     }
 
-    pub fn process_includes(&mut self) -> Result<usize, ()> {
+    /// Returns a usize indicating the number of includes that were processed
+    /// successfully.
+    ///
+    /// Replaces every include command in the document with the content of the
+    /// file it references.
+    ///
+    /// # Errors
+    /// Returns a [`Error`] if a file referenced by one of the include
+    /// statements is unable to be opened for reading.
+    ///
+    /// [`Error`]: enum.Error.html
+    pub fn process_includes(&mut self) -> Result<usize, Error> {
         let compare = |element: &Element| match element {
             Element::Include(_) => true,
             _ => false
@@ -44,8 +70,7 @@ impl Document {
                     _ => unreachable!()
                 };
 
-                //TODO: Handle errors correctly
-                let contents = fs::read_to_string(filename).unwrap();
+                let contents = fs::read_to_string(filename)?;
                 self.elements.remove(index);
 
                 let include_elements = Element::parse_elements(&contents);
@@ -60,7 +85,16 @@ impl Document {
         }
     }
 
-    pub fn get_pattern(&self, name: &str) -> Result<Document, ()> {
+    /// Returns a [`Document`] of the elements in the pattern
+    ///
+    /// Retreives the pattern `name`
+    ///
+    /// # Errors
+    /// Returns a [`Error`] if the pattern does not exist.
+    ///
+    /// [`Error`]: enum.Error.html
+    /// [`Document`]: struct.Document.html
+    pub fn get_pattern(&self, name: &str) -> Result<Document, Error> {
         let compare = |element: &&Element| match element {
             Element::Pattern(pname, _) if pname == name => true,
             _ => false,
@@ -74,10 +108,21 @@ impl Document {
             }
         }
 
-        Err(())
+        Err(Error::BadPattern(name.to_string()))
     }
 
-    pub fn set_pattern(&mut self, name: &str, pattern: Document) -> Result<usize, ()> {
+    /// Returns a usize indicating how many elements were inserted into the
+    /// document.
+    ///
+    /// Inserts the elementa from `pattern` into this document, before the
+    /// pattern `name`
+    ///
+    /// # Errors
+    /// Returns a [`Error`] if the pattern does
+    /// not exist.
+    ///
+    /// [`Error`]: enum.Error.html
+    pub fn set_pattern(&mut self, name: &str, pattern: Document) -> Result<usize, Error> {
         let compare = |element: &Element| match element {
             Element::Pattern(pname, _) if pname == name => true,
             _ => false,
@@ -93,9 +138,13 @@ impl Document {
             return Ok(elements_inserted);
         }
 
-        Err(())
+        Err(Error::BadPattern(name.to_string()))
     }
 
+    /// Returns a string of this document.
+    ///
+    /// Only text is included in the string. No variables, unproccesed includes,
+    /// or patterns will be in the string.
     pub fn as_string(self) -> String {
         let mut string = String::new();
 
