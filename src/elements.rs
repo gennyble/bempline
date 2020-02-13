@@ -18,57 +18,67 @@ impl Element {
                 break;
             }
 
-            if let Some((start, end)) = Self::find_next_element(text) {
-                if let Some(element) = Self::parse_element(&text[start..end]) {
-                    if !text[..start].is_empty() {
-                        elements.push(Element::Text(text[..start].to_owned()));
-                    }
+            let (start, end) = match Self::find_next_element(text) {
+                Some((start, end)) => (start, end),
+                None => {
+                    elements.push(Element::Text(text.to_owned()));
+                    break;
+                }
+            };
 
-                    if let Element::PatternEnd = element {
-                        let mut tempvec: Vec<Element> = vec![];
-
-                        loop {
-                            //TODO: Handle error
-                            let elem = elements.pop().unwrap();
-
-                            if let Element::PatternStart(name) = elem {
-                                tempvec.reverse();
-                                elements.push(Element::Pattern(name, tempvec));
-                                break;
-                            } else {
-                                tempvec.push(elem);
-                            }
-                        }
-                    } else {
-                        elements.push(element);
-                    }
-                } else {
+            let element = match Self::parse_element(&text[start..end]) {
+                Some(element) => element,
+                None => {
                     if !text[..end].is_empty() {
                         elements.push(Element::Text(text[..end].to_owned()));
                     }
-                }
 
-                text = &text[end..];
-            } else {
-                elements.push(Element::Text(text.to_owned()));
-                break;
+                    break;
+                }
+            };
+
+            if !text[..start].is_empty() {
+                elements.push(Element::Text(text[..start].to_owned()));
             }
+
+            if let Element::PatternEnd = element {
+                let mut tempvec: Vec<Element> = vec![];
+
+                loop {
+                    //TODO: Handle error caused by a lack of Element::PatternStart
+                    let elem = elements.pop().unwrap();
+
+                    if let Element::PatternStart(name) = elem {
+                        tempvec.reverse();
+                        elements.push(Element::Pattern(name, tempvec));
+                        break;
+                    } else {
+                        tempvec.push(elem);
+                    }
+                }
+            } else {
+                elements.push(element);
+            }
+
+            text = &text[end..];
         }
 
         elements
     }
 
     fn parse_element(text: &str) -> Option<Element> {
+        // All elements much start {~ and end ~}
         if !(text.starts_with("{~ ") && text.ends_with(" ~}")) {
-            println!("Doesn't start and end");
             return None;
         }
 
+        // Remove the start/end delimiters
         let text = &text[3..text.len() - 3];
         if text.len() < 1 {
             return None;
         }
 
+        // Identify commands and variables
         if text.starts_with('@') {
             return Self::parse_command(&text[1..]);
         } else if text.starts_with('$') {
@@ -79,11 +89,15 @@ impl Element {
     }
 
     fn parse_command(text: &str) -> Option<Element> {
-        if text.starts_with("include ") {
-            return Some(Element::Include(text[8..].to_owned()));
-        } else if text.starts_with("pattern ") {
-            return Some(Element::PatternStart(text[8..].to_owned()));
-        } else if text == "end-pattern" {
+        let cmd_include = "include ";
+        let cmd_pattern_start = "pattern ";
+        let cmd_pattern_end = "end-pattern";
+
+        if text.starts_with(cmd_include) {
+            return Some(Element::Include(text[cmd_include.len()..].to_owned()));
+        } else if text.starts_with(cmd_pattern_start) {
+            return Some(Element::PatternStart(text[cmd_pattern_start.len()..].to_owned()));
+        } else if text == cmd_pattern_end {
             return Some(Element::PatternEnd);
         }
 

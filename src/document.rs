@@ -13,14 +13,9 @@ impl Document {
     }
 
     pub fn set_variable(&mut self, key: &str, value: &str) -> usize {
-        let compare = |element: &Element| {
-            if let Element::Variable(varval) = element {
-                if varval == key {
-                    return true;
-                }
-            }
-
-            false
+        let compare = |element: &Element| match element {
+            Element::Variable(vkey) if vkey == key => true,
+            _ => false
         };
 
         let mut variables_processed = 0;
@@ -36,21 +31,17 @@ impl Document {
     }
 
     pub fn process_includes(&mut self) -> Result<usize, ()> {
-        let compare = |element: &Element| {
-            if let Element::Include(_) = element {
-                true
-            } else {
-                false
-            }
+        let compare = |element: &Element| match element {
+            Element::Include(_) => true,
+            _ => false
         };
 
         let mut includes_processed = 0;
         loop {
             if let Some(index) = self.elements.iter().position(compare) {
-                let filename = if let Element::Include(edata) = self.elements.get(index).unwrap() {
-                    edata
-                } else {
-                    panic!("How did bsearch find this?");
+                let filename = match self.elements.get(index).unwrap() {
+                    Element::Include(name) => name,
+                    _ => unreachable!()
                 };
 
                 //TODO: Handle errors correctly
