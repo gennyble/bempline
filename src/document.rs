@@ -2,6 +2,7 @@ use crate::elements::Element;
 use crate::error::Error;
 use std::fs;
 
+#[derive(Copy, Clone)]
 pub struct Document {
     elements: Vec<Element>,
 }
