@@ -13,6 +13,8 @@ pub enum Error {
     IOError(IOError),
     /// The pattern could not be found
     BadPattern(String),
+    /// A Required Element was not used
+    UnusedRequire(String)
 }
 
 impl ErrorTrait for Error {
@@ -28,7 +30,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::IOError(ioe) => ioe.fmt(f),
-            Error::BadPattern(name) => write!(f, "The pattern {} does not exist", name)
+            Error::BadPattern(name) => write!(f, "The pattern {} does not exist", name),
+            Error::UnusedRequire(context) => write!(f, "Unused Require: {}", context)
         }
     }
 }
