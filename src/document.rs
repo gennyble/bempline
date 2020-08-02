@@ -1,6 +1,7 @@
 use crate::elements::Element;
 use crate::error::Error;
 use std::fs;
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Document {
@@ -26,11 +27,11 @@ impl Document {
     /// let num_replaced = doc.set_variable("noun", "World");
     ///
     /// assert_eq!(num_replaced, 1);
-    /// assert_eq!(doc.as_string(), "Hello, World!");
+    /// assert_eq!(doc.as_string().unwrap(), "Hello, World!");
     /// ```
     pub fn set_variable(&mut self, key: &str, value: &str) -> usize {
         let compare = |element: &Element| match element {
-            Element::Variable(vkey) if vkey == key => true,
+            Element::Variable(vkey, _) if vkey == key => true,
             _ => false
         };
 
@@ -52,14 +53,19 @@ impl Document {
     /// Replaces every include command in the document with the content of the
     /// file it references.
     ///
+    /// If you provide a string for working_dir, that path will be used for
+    /// relative file paths instead of the current working directory. If you
+    /// pass `None`, then the current working directory is used for relative
+    /// paths.
+    ///
     /// # Errors
     /// Returns a [`Error`] if a file referenced by one of the include
     /// statements is unable to be opened for reading.
     ///
     /// [`Error`]: enum.Error.html
-    pub fn process_includes(&mut self) -> Result<usize, Error> {
+    pub fn process_includes(&mut self, working_dir: Option<&str>) -> Result<usize, Error> {
         let compare = |element: &Element| match element {
-            Element::Include(_) => true,
+            Element::Include(_, _) => true,
             _ => false
         };
 
@@ -67,11 +73,15 @@ impl Document {
         loop {
             if let Some(index) = self.elements.iter().position(compare) {
                 let filename = match self.elements.get(index).unwrap() {
-                    Element::Include(name) => name,
+                    Element::Include(name, _) => name,
                     _ => unreachable!()
                 };
 
-                let contents = fs::read_to_string(filename)?;
+                let contents = match working_dir {
+                    Some(ref dir) => fs::read_to_string(Path::new(dir).join(filename))?,
+                    None => fs::read_to_string(filename)?
+                };
+
                 self.elements.remove(index);
 
                 let include_elements = Element::parse_elements(&contents);
@@ -146,14 +156,14 @@ impl Document {
     ///
     /// Only text is included in the string. No variables, unproccesed includes,
     /// or patterns will be in the string.
-    pub fn as_string(self) -> String {
+    pub fn as_string(self) -> Result<String, Error> {
         let mut string = String::new();
 
         for element in self.elements {
-            string.push_str(&element.string());
+            string.push_str(&element.string()?);
         }
 
-        string
+        Ok(string)
     }
 }
 
@@ -166,15 +176,15 @@ mod tests {
         let test_str = "Test{~ $var ~}{~ @include tests/testdoc ~}tesT";
         let cmp_before_vec = [
             Element::Text(String::from("Test")),
-            Element::Variable(String::from("var")),
-            Element::Include(String::from("tests/testdoc")),
+            Element::Variable(String::from("var"), false),
+            Element::Include(String::from("tests/testdoc"), true),
             Element::Text(String::from("tesT")),
         ];
         let cmp_after_vec = [
             Element::Text(String::from("Test")),
-            Element::Variable(String::from("var")),
+            Element::Variable(String::from("var"), false),
             Element::Text(String::from("Testdoc!")),
-            Element::Variable(String::from("var")),
+            Element::Variable(String::from("var"), false),
             Element::Text(String::from("\n")),
             Element::Text(String::from("tesT")),
         ];
@@ -182,7 +192,25 @@ mod tests {
         let mut doc = Document::new(test_str);
         assert_eq!(doc.elements, cmp_before_vec);
 
-        let includes = doc.process_includes().unwrap();
+        let includes = doc.process_includes(None).unwrap();
+        assert_eq!(1, includes);
+        assert_eq!(doc.elements, cmp_after_vec);
+    }
+
+    #[test]
+    fn test_include_working_dir() {
+        let test_str = "{~ @include bar ~}";
+        let cmp_before_vec = [
+            Element::Include(String::from("bar"), true),
+        ];
+        let cmp_after_vec = [
+            Element::Text(String::from("Referencing as just 'bar' because 'foo' is the new working directory."))
+        ];
+
+        let mut doc = Document::new(test_str);
+        assert_eq!(doc.elements, cmp_before_vec);
+
+        let includes = doc.process_includes(Some("tests/foo")).unwrap();
         assert_eq!(1, includes);
         assert_eq!(doc.elements, cmp_after_vec);
     }
@@ -190,18 +218,18 @@ mod tests {
     #[test]
     fn test_nested_include() {
         let test_str = "{~ @include tests/testdoc_nested ~}";
-        let cmp_before_vec = [Element::Include(String::from("tests/testdoc_nested"))];
+        let cmp_before_vec = [Element::Include(String::from("tests/testdoc_nested"), true)];
         let cmp_after_vec = [
-            Element::Text(String::from("Testdoc!")), // From testdoc
-            Element::Variable(String::from("var")),  // From testdoc
-            Element::Text(String::from("\n")),       // From testdoc
-            Element::Text(String::from("\n")),       // From testdoc_nested
+            Element::Text(String::from("Testdoc!")),        // From testdoc
+            Element::Variable(String::from("var"), false),  // From testdoc
+            Element::Text(String::from("\n")),              // From testdoc
+            Element::Text(String::from("\n")),              // From testdoc_nested
         ];
 
         let mut doc = Document::new(test_str);
         assert_eq!(doc.elements, cmp_before_vec);
 
-        let includes = doc.process_includes().unwrap();
+        let includes = doc.process_includes(None).unwrap();
         assert_eq!(2, includes);
         assert_eq!(doc.elements, cmp_after_vec);
     }
@@ -211,7 +239,7 @@ mod tests {
         let test_str = "Test!{~ $foo ~}";
         let cmp_before_vec = vec![
             Element::Text(String::from("Test!")),
-            Element::Variable(String::from("foo")),
+            Element::Variable(String::from("foo"), false),
         ];
         let cmp_after_vec = vec![
             Element::Text(String::from("Test!")),
@@ -231,14 +259,14 @@ mod tests {
         let test_str = "Test!{~ $foo ~}{~ $foobar ~}{~ $foo ~}";
         let cmp_before_vec = vec![
             Element::Text(String::from("Test!")),
-            Element::Variable(String::from("foo")),
-            Element::Variable(String::from("foobar")),
-            Element::Variable(String::from("foo")),
+            Element::Variable(String::from("foo"), false),
+            Element::Variable(String::from("foobar"), false),
+            Element::Variable(String::from("foo"), false),
         ];
         let cmp_after_foo_vec = vec![
             Element::Text(String::from("Test!")),
             Element::Text(String::from("bar")),
-            Element::Variable(String::from("foobar")),
+            Element::Variable(String::from("foobar"), false),
             Element::Text(String::from("bar")),
         ];
         let cmp_after_foobar_vec = vec![
@@ -263,12 +291,12 @@ mod tests {
     #[test]
     fn test_get_pattern() {
         let test_str = "Test{~ @pattern pat ~}{~ $var ~}{~ @end-pattern ~}";
-        let cmp_pat_vec = vec![Element::Variable(String::from("var"))];
+        let cmp_pat_vec = vec![Element::Variable(String::from("var"), false)];
         let cmp_vec = vec![
             Element::Text(String::from("Test")),
             Element::Pattern(
                 String::from("pat"),
-                vec![Element::Variable(String::from("var"))],
+                vec![Element::Variable(String::from("var"), false)],
             ),
         ];
 
@@ -282,31 +310,31 @@ mod tests {
     #[test]
     fn test_set_pattern() {
         let test_str = "Test!{~ @pattern pat ~}{~ $var ~}{~ @end-pattern ~}!tesT";
-        let cmp_pat_vec = vec![Element::Variable(String::from("var"))];
+        let cmp_pat_vec = vec![Element::Variable(String::from("var"), false)];
         let cmp_vec_0 = vec![
             Element::Text(String::from("Test!")),
             Element::Pattern(
                 String::from("pat"),
-                vec![Element::Variable(String::from("var"))],
+                vec![Element::Variable(String::from("var"), false)],
             ),
             Element::Text(String::from("!tesT")),
         ];
         let cmp_vec_1 = vec![
             Element::Text(String::from("Test!")),
-            Element::Variable(String::from("var")),
+            Element::Variable(String::from("var"), false),
             Element::Pattern(
                 String::from("pat"),
-                vec![Element::Variable(String::from("var"))],
+                vec![Element::Variable(String::from("var"), false)],
             ),
             Element::Text(String::from("!tesT")),
         ];
         let cmp_vec_2 = vec![
             Element::Text(String::from("Test!")),
-            Element::Variable(String::from("var")),
+            Element::Variable(String::from("var"), false),
             Element::Text(String::from("rav")),
             Element::Pattern(
                 String::from("pat"),
-                vec![Element::Variable(String::from("var"))],
+                vec![Element::Variable(String::from("var"), false)],
             ),
             Element::Text(String::from("!tesT")),
         ];
@@ -338,10 +366,19 @@ mod tests {
             "Hello, my name is genbyte!\nIncluding testdoc:\n\tTestdoc! Variable replaced.\n";
 
         let mut doc = Document::new(test_str);
-        doc.process_includes().unwrap();
+        doc.process_includes(None).unwrap();
         doc.set_variable("name", "genbyte");
         doc.set_variable("var", " Variable replaced.");
 
-        assert_eq!(doc.as_string(), cmp_str);
+        assert_eq!(doc.as_string().unwrap(), cmp_str);
+    }
+
+    #[test]
+    fn test_to_string_panic_unused_require() {
+        let test_str =
+            "{~ @include tests/testdoc ~}";
+
+        let doc = Document::new(test_str);
+        doc.as_string().unwrap_err();
     }
 }

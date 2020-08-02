@@ -37,3 +37,15 @@ Coorp.
 	<p>{~ $summary ~}</p>
 </div>
 {~ @end-pattern ~}
+```
+
+## Optional Variables/Includes (2.0.0)
+You can make a variable optional or required by appending a '?' or '!' to the
+end of the name, respectively. For example, if you want to require that the
+variable `foo` *must always* be replaced with a value, you can write `$foo!`. A
+program conforming to this spec should return an error if a document is
+finalized with a required variable that is not filled in. Variables default to
+*optional*.
+
+In a similar sense, an include can be made optional like this:
+`@include? foo.txt`. Includes default to *required*.

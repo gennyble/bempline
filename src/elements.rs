@@ -1,8 +1,10 @@
+use crate::error::Error;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Element {
     Text(String),
-    Variable(String),
-    Include(String),
+    Variable(String, bool),
+    Include(String, bool),
     Pattern(String, Vec<Element>),
     PatternStart(String),
     PatternEnd,
@@ -82,7 +84,19 @@ impl Element {
         if text.starts_with('@') {
             return Self::parse_command(&text[1..]);
         } else if text.starts_with('$') {
-            return Some(Element::Variable(text[1..].to_owned()));
+            let mut var_name = text[1..].to_owned();
+
+            let required_flag = if var_name.ends_with("!") {
+                var_name.pop();
+                true
+            } else if var_name.ends_with("?") {
+                var_name.pop();
+                false
+            } else {
+                false
+            };
+
+            return Some(Element::Variable(var_name, required_flag));
         }
 
         None
@@ -90,11 +104,17 @@ impl Element {
 
     fn parse_command(text: &str) -> Option<Element> {
         let cmd_include = "include ";
+        let cmd_include_optional = "include? ";
+        let cmd_include_require = "include! ";
         let cmd_pattern_start = "pattern ";
         let cmd_pattern_end = "end-pattern";
 
         if text.starts_with(cmd_include) {
-            return Some(Element::Include(text[cmd_include.len()..].to_owned()));
+            return Some(Element::Include(text[cmd_include.len()..].to_owned(), true));
+        } else if text.starts_with(cmd_include_optional) {
+            return Some(Element::Include(text[cmd_include_optional.len()..].to_owned(), false));
+        } else if text.starts_with(cmd_include_require) {
+            return Some(Element::Include(text[cmd_include_require.len()..].to_owned(), true));
         } else if text.starts_with(cmd_pattern_start) {
             return Some(Element::PatternStart(text[cmd_pattern_start.len()..].to_owned()));
         } else if text == cmd_pattern_end {
@@ -114,10 +134,16 @@ impl Element {
         None
     }
 
-    pub fn string(self) -> String {
+    pub fn string(self) -> Result<String, Error> {
         match self {
-            Element::Text(text) => text,
-            _ => String::new(),
+            Element::Text(text) => Ok(text),
+            Element::Variable(name, requried) if requried == true => {
+                return Err(Error::UnusedRequire(format!("Required variable with name {}", name)))
+            },
+            Element::Include(path, requried) if requried == true => {
+                return Err(Error::UnusedRequire(format!("Required @include with path {}", path)))
+            },
+            _ => Ok(String::new()),
         }
     }
 }
@@ -131,7 +157,7 @@ mod tests {
         let test_str = "Test{~ $test ~}!";
         let cmp_vec = vec![
             Element::Text(String::from("Test")),
-            Element::Variable(String::from("test")),
+            Element::Variable(String::from("test"), false),
             Element::Text(String::from("!")),
         ];
 
@@ -145,9 +171,9 @@ mod tests {
             "This is a {~ $word ~} string! Did I spell it right? {~ @include dictionary.txt ~}";
         let cmp_vec = vec![
             Element::Text(String::from("This is a ")),
-            Element::Variable(String::from("word")),
+            Element::Variable(String::from("word"), false),
             Element::Text(String::from(" string! Did I spell it right? ")),
-            Element::Include(String::from("dictionary.txt")),
+            Element::Include(String::from("dictionary.txt"), true),
         ];
 
         let parsed = Element::parse_elements(&test_str);
@@ -164,7 +190,7 @@ mod tests {
                 String::from("listItem"),
                 vec![
                     Element::Text(String::from("\n<li>")),
-                    Element::Variable(String::from("text")),
+                    Element::Variable(String::from("text"), false),
                     Element::Text(String::from("</li>\n")),
                 ],
             ),
@@ -177,13 +203,43 @@ mod tests {
     #[test]
     fn test_to_string() {
         let text = Element::Text(String::from("TextTest"));
-        let variable = Element::Variable(String::from("VariableTest"));
-        let include = Element::Include(String::from("IncludeTest"));
+        let variable_opt = Element::Variable(String::from("VariableTest"), false);
+        let variable_req = Element::Variable(String::from("VariableTest"), true);
+        let include_opt = Element::Include(String::from("IncludeTest"), false);
+        let include_req = Element::Include(String::from("IncludeTest"), true);
         let pattern = Element::Pattern(String::from("PatternTest"), vec![]);
 
-        assert_eq!(text.string(), "TextTest");
-        assert_eq!(variable.string(), "");
-        assert_eq!(include.string(), "");
-        assert_eq!(pattern.string(), "");
+        assert_eq!(text.string().unwrap(), "TextTest");
+        assert_eq!(variable_opt.string().unwrap(), "");
+        variable_req.string().unwrap_err();
+        assert_eq!(include_opt.string().unwrap(), "");
+        include_req.string().unwrap_err();
+        assert_eq!(pattern.string().unwrap(), "");
+    }
+
+    #[test]
+    fn test_variable_optional() {
+        let test_str = "{~ $foo? ~}{~ $bar! ~}{~ $foobar ~}";
+        let variable_opt = Element::Variable(String::from("foo"), false);
+        let variable_req = Element::Variable(String::from("bar"), true);
+        let variable_default_opt = Element::Variable(String::from("foobar"), false);
+
+        let mut parsed = Element::parse_elements(&test_str);
+        assert_eq!(parsed.pop(), Some(variable_default_opt));
+        assert_eq!(parsed.pop(), Some(variable_req));
+        assert_eq!(parsed.pop(), Some(variable_opt));
+    }
+
+    #[test]
+    fn test_include_optional() {
+        let test_str = "{~ @include? foo ~}{~ @include! bar ~}{~ @include foobar ~}";
+        let include_opt = Element::Include(String::from("foo"), false);
+        let include_req = Element::Include(String::from("bar"), true);
+        let include_default_opt = Element::Include(String::from("foobar"), true);
+
+        let mut parsed = Element::parse_elements(&test_str);
+        assert_eq!(parsed.pop(), Some(include_default_opt));
+        assert_eq!(parsed.pop(), Some(include_req));
+        assert_eq!(parsed.pop(), Some(include_opt));
     }
 }

@@ -11,5 +11,5 @@ fn test() {
     doc.set_variable("name", "Bempline");
     doc.set_variable("location", "SourceHut");
 
-    assert_eq!(doc.as_string(), cmp_str);
+    assert_eq!(doc.as_string().unwrap(), cmp_str);
 }
