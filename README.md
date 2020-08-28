@@ -1,5 +1,5 @@
 # Bempline
-[docs.rs][docs] | [crates.io][crates] | [todo.sr.ht][tickets]
+[docs.rs][docs] | [crates.io][crates]
 
 Bempline is a [Portmanteau](https://en.wikipedia.org/wiki/Portmanteau) for
 **B**ad t**empl**ate eng**ine**. This project is my foray into string processing
@@ -8,4 +8,3 @@ language works.
 
 [crates]: https://crates.io/crates/bempline
 [docs]: https://docs.rs/bempline
-[tickets]: https://todo.sr.ht/~genbyte/bempline
