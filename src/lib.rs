@@ -1,6 +1,41 @@
+//! ### Syntax
+//! Variables are alphanumeric strings (underscores, too) surrounded by braces. Here's an `{example}`.
+//!
+//! You can prevent `{word}` from being seen as a variable by escaping the opening brace. Like `\{this}`.
+//!
+//! ## Example
+//! If you have this document in something like `template.bpl`
+//! ```text
+//! Dear {name},
+//!
+//! Some generic email text here!
+//!
+//! Sincerely,
+//! Some Company
+//! ```
+//!
+//! You can fill it out for the named `Ferris` and `Rusty` like so
+//! ```rust
+//! use bempline::Document;
+//!
+//! fn main() {
+//! 	let doc = Document::from_file("template.bpl").unwrap();
+//! 	let names = vec!["Ferris", "Rusty"];
+//!
+//! 	for name in names {
+//! 		let mut cloned = doc.clone();
+//! 		cloned.set("name", name);
+//!
+//! 		println!("{}", cloned.compile());
+//! 	}
+//! }
+//! ```
+
 use std::{
     collections::HashMap,
+    io,
     iter::Peekable,
+    path::Path,
     str::{Chars, FromStr},
 };
 
@@ -11,6 +46,11 @@ pub struct Document {
 }
 
 impl Document {
+    /// Attempt to read an entire file and parse it as a Document
+    pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        std::fs::read_to_string(path).map(|str| str.parse().unwrap())
+    }
+
     /// Clear all set variables as if this document was just parsed.
     pub fn clear_variables(&mut self) {
         self.variables.clear();
