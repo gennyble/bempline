@@ -10,6 +10,42 @@ pub struct Document {
     variables: HashMap<String, String>,
 }
 
+impl Document {
+    /// Clear all set variables as if this document was just parsed.
+    pub fn clear_variables(&mut self) {
+        self.variables.clear();
+    }
+
+    /// Set a variable with the given key to the given value
+    pub fn set<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) {
+        self.variables.insert(key.into(), value.into());
+    }
+
+    /// Compile the document into a string. If you set a value for a variable,
+    /// it will be replaced. If you have not, the declaration is passed through.
+    /// IE: If you have {variable} and do not set a value, it'll come through
+    /// with the braces and all.
+    pub fn compile(self) -> String {
+        let mut ret = String::new();
+
+        for token in self.tokens {
+            match token {
+                Token::Text(str) => ret.push_str(&str),
+                Token::Variable(key) => match self.variables.get(&key) {
+                    Some(value) => ret.push_str(value),
+                    None => {
+                        ret.push('{');
+                        ret.push_str(&key);
+                        ret.push('}');
+                    }
+                },
+            }
+        }
+
+        ret
+    }
+}
+
 impl FromStr for Document {
     type Err = ();
 
@@ -70,12 +106,6 @@ impl FromStr for Document {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-enum Token {
-    Text(String),
-    Variable(String),
-}
-
 fn take_while_chars(iter: &mut Peekable<Chars>, func: impl Fn(&char) -> bool) -> String {
     let mut ret = String::new();
 
@@ -89,9 +119,34 @@ fn take_while_chars(iter: &mut Peekable<Chars>, func: impl Fn(&char) -> bool) ->
     ret
 }
 
+#[derive(Clone, Debug, PartialEq)]
+enum Token {
+    Text(String),
+    Variable(String),
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn compile_all_set() {
+        let mut doc = Document::from_str("One: {one} | Two: {two} | Three: {three}").unwrap();
+        doc.set("one", "1");
+        doc.set("two", "2");
+        doc.set("three", "3");
+
+        assert_eq!(&doc.compile(), "One: 1 | Two: 2 | Three: 3");
+    }
+
+    #[test]
+    fn compile_some_set() {
+        let mut doc = Document::from_str("One: {one} | Two: {two} | Three: {three}").unwrap();
+        doc.set("one", "1");
+        doc.set("three", "3");
+
+        assert_eq!(&doc.compile(), "One: 1 | Two: {two} | Three: 3");
+    }
 
     // Parsing related tests
 
