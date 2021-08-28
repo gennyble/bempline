@@ -19,7 +19,7 @@
 //! use bempline::Document;
 //!
 //! fn main() {
-//! 	let doc = Document::from_file("template.bpl").unwrap();
+//! 	let doc = Document::from_file("test/template.bpl").unwrap();
 //! 	let names = vec!["Ferris", "Rusty"];
 //!
 //! 	for name in names {
