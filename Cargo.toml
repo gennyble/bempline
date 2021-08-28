@@ -1,8 +1,8 @@
 [package]
 name = "bempline"
-version = "2.0.0"
+version = "0.2.0"
 description = "Simple template library"
-authors = ["genuinebyte <crates@genbyte.dev>"]
+authors = ["Genny <gen@nyble.dev>"]
 repository = "https://git.sr.ht/~genbyte/bempline"
 readme = "README.md"
 keywords = ["template", "html"]
