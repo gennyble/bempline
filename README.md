@@ -17,7 +17,7 @@ Sincerely,
 Some Company
 ```
 
-You can fill it out for the named `Ferris` and `Rusty` like so
+You can fill it out for the names `Ferris` and `Rusty` like so
 ```rust
 use bempline::Document;
 
