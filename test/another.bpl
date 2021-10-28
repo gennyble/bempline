@@ -1,0 +1,1 @@
+The included file! With a {variable}!
