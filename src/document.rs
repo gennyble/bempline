@@ -73,11 +73,10 @@ impl Document {
 				Token::IfSet {
 					variable_name,
 					tokens,
-				} => {
-					if self.variables.contains_key(&variable_name) {
-						ret.push_str(&self.tokens_to_string(tokens))
-					}
-				}
+				} => match self.variables.get(&variable_name) {
+					Some(val) if !val.is_empty() => ret.push_str(&self.tokens_to_string(tokens)),
+					_ => (),
+				},
 				Token::End => (),
 			}
 		}

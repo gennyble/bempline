@@ -205,8 +205,19 @@ mod test {
 	#[test]
 	fn ifset_variable_set() {
 		let mut doc = Document::from_str("{%if-set foo}set!{%end end}").unwrap();
-		doc.set("foo", "");
+		doc.set("foo", "bar");
 
 		assert_eq!(doc.compile(), "set!")
+	}
+
+	#[test]
+	fn ifset_variable_set_empty_string() {
+		let mut doc =
+			Document::from_str("{%if-set foo}set!{%end end}{%if-set bar}barset!{%end end}")
+				.unwrap();
+		doc.set("foo", "");
+		doc.set("bar", "set!");
+
+		assert_eq!(doc.compile(), "barset!")
 	}
 }
