@@ -51,10 +51,15 @@ impl Document {
 	/// it will be replaced. If you have not, the declaration is passed through.
 	/// IE: If you have {variable} and do not set a value, it'll come through
 	/// with the braces and all.
-	pub fn compile(self) -> String {
+	pub fn compile(mut self) -> String {
+		let tokens = self.tokens.drain(..).collect();
+		self.tokens_to_string(tokens)
+	}
+
+	fn tokens_to_string(&self, tokens: Vec<Token>) -> String {
 		let mut ret = String::new();
 
-		for token in self.tokens {
+		for token in tokens {
 			match token {
 				Token::Text(str) => ret.push_str(&str),
 				Token::Variable { name } => match self.variables.get(&name) {
@@ -65,6 +70,15 @@ impl Document {
 						ret.push('}');
 					}
 				},
+				Token::IfSet {
+					variable_name,
+					tokens,
+				} => {
+					if self.variables.contains_key(&variable_name) {
+						ret.push_str(&self.tokens_to_string(tokens))
+					}
+				}
+				Token::End => (),
 			}
 		}
 
@@ -72,6 +86,49 @@ impl Document {
 	}
 
 	fn parse_string<S: AsRef<str>>(mut self, raw: S) -> Result<Self, ParseError> {
+		let Document {
+			options,
+			template_path,
+			tokens,
+			variables,
+		} = self.first_pass(raw)?;
+
+		let mut new_tokens = vec![];
+		let mut current = None;
+
+		for token in tokens {
+			match current {
+				None => {
+					current = Some(token);
+				}
+				Some(Token::IfSet { ref mut tokens, .. }) => match token {
+					Token::End => {
+						new_tokens.push(current.unwrap());
+						current = None;
+					}
+					_ => tokens.push(token),
+				},
+				Some(tok) => {
+					new_tokens.push(tok);
+					current = Some(token);
+				}
+			}
+		}
+
+		if let Some(tok) = current {
+			new_tokens.push(tok);
+		}
+
+		Ok(Self {
+			options,
+			template_path,
+			tokens: new_tokens,
+			variables,
+		})
+	}
+
+	// Does all the parsing and follows includes but does not collapse IfSet
+	fn first_pass<S: AsRef<str>>(mut self, raw: S) -> Result<Self, ParseError> {
 		let mut current = String::new();
 		let mut chars = raw.as_ref().chars().peekable();
 		loop {
@@ -170,6 +227,25 @@ impl Document {
 					Ok(())
 				}
 			}
+			"if-set" => {
+				if arguments.is_empty() {
+					Err(ParseError::CommandArgumentInvalid {
+						command: command.into(),
+						argument: arguments.into(),
+					})
+				} else {
+					self.tokens.push(Token::IfSet {
+						variable_name: arguments.into(),
+						tokens: vec![],
+					});
+
+					Ok(())
+				}
+			}
+			"end" => {
+				self.tokens.push(Token::End);
+				Ok(())
+			}
 			_ => Err(ParseError::UnknownCommand {
 				command: command.to_owned(),
 			}),
@@ -256,7 +332,14 @@ fn take_while_chars(iter: &mut Peekable<Chars>, func: impl Fn(&char) -> bool) ->
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
 	Text(String),
-	Variable { name: String },
+	Variable {
+		name: String,
+	},
+	IfSet {
+		variable_name: String,
+		tokens: Vec<Token>,
+	},
+	End,
 }
 
 #[derive(Debug)]
