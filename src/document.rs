@@ -199,10 +199,11 @@ impl Document {
 		match s.chars().next() {
 			None => self.tokens.push(Token::Text("{}".into())),
 			Some('%') => {
+				let stripped_and_trimmed = s.strip_prefix('%').unwrap().trim();
 				//Command
-				match s.strip_prefix('%').unwrap().split_once(' ') {
-					Some((command, arguments)) => self.parse_command(command, arguments)?,
-					None => return Err(ParseError::UnknownCommand { command: s.into() }),
+				match stripped_and_trimmed.split_once(' ') {
+					Some((command, arguments)) => self.parse_command(command, Some(arguments))?,
+					None => self.parse_command(stripped_and_trimmed, None)?,
 				}
 			}
 			Some(_) => self.tokens.push(Token::Variable { name: s.into() }),
@@ -211,38 +212,42 @@ impl Document {
 		Ok(())
 	}
 
-	fn parse_command(&mut self, command: &str, arguments: &str) -> Result<(), ParseError> {
-		match command {
-			"include" => {
-				if arguments.is_empty() {
-					Err(ParseError::CommandArgumentInvalid {
-						command: command.into(),
-						argument: arguments.into(),
-					})
-				} else {
-					let resolved = self.resolve_include_path(arguments)?;
-					let doc = Document::from_file(resolved, self.options.clone())?;
-					self.tokens.extend_from_slice(&doc.tokens);
-					Ok(())
-				}
-			}
-			"if-set" => {
-				if arguments.is_empty() {
-					Err(ParseError::CommandArgumentInvalid {
-						command: command.into(),
-						argument: arguments.into(),
-					})
-				} else {
-					self.tokens.push(Token::IfSet {
-						variable_name: arguments.into(),
-						tokens: vec![],
-					});
+	fn parse_command(&mut self, command: &str, arguments: Option<&str>) -> Result<(), ParseError> {
+		let invalid_arguments = || {
+			Err(ParseError::CommandArgumentInvalid {
+				command: command.into(),
+				argument: arguments.unwrap_or_default().to_string(),
+			})
+		};
 
-					Ok(())
-				}
-			}
+		match command {
 			"end" => {
 				self.tokens.push(Token::End);
+				return Ok(());
+			}
+			_ => (),
+		}
+
+		let arguments = match arguments {
+			None => return invalid_arguments(),
+			Some(args) if args.is_empty() => return invalid_arguments(),
+			Some(args) => args,
+		};
+
+		// Reaching here means we have arguments and they are not an empty string
+		match command {
+			"include" => {
+				let resolved = self.resolve_include_path(arguments)?;
+				let doc = Document::from_file(resolved, self.options.clone())?;
+				self.tokens.extend_from_slice(&doc.tokens);
+				Ok(())
+			}
+			"if-set" => {
+				self.tokens.push(Token::IfSet {
+					variable_name: arguments.into(),
+					tokens: vec![],
+				});
+
 				Ok(())
 			}
 			_ => Err(ParseError::UnknownCommand {
