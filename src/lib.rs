@@ -201,4 +201,12 @@ mod test {
 			]
 		)
 	}
+
+	#[test]
+	fn ifset_variable_set() {
+		let mut doc = Document::from_str("{%if-set foo}set!{%end end}").unwrap();
+		doc.set("foo", "");
+
+		assert_eq!(doc.compile(), "set!")
+	}
 }
