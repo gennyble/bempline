@@ -1,6 +1,6 @@
 [package]
 name = "bempline"
-version = "0.4.0"
+version = "0.4.1"
 description = "Simple template library"
 authors = ["Genny <gen@nyble.dev>"]
 repository = "https://github.com/gennyble/bempline"
