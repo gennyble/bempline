@@ -219,4 +219,36 @@ mod test {
 
 		assert_eq!(doc.compile(), "barset!")
 	}
+
+	#[test]
+	fn pattern_parse() {
+		let doc = Document::from_str("{%pattern name}blah{variable}lah{%end}").unwrap();
+
+		assert_eq!(
+			doc.get_pattern("name").unwrap().tokens,
+			vec![
+				Token::Text(String::from("blah")),
+				Token::Variable {
+					name: String::from("variable")
+				},
+				Token::Text(String::from("lah"))
+			]
+		)
+	}
+
+	#[test]
+	fn pattern_fill() {
+		let mut doc = Document::from_str("{%pattern name}-{variable}-{%end}").unwrap();
+
+		let mut pat = doc.get_pattern("name").unwrap();
+
+		let mut name = pat.clone();
+		name.set("variable", "one");
+		pat.set("variable", "two");
+
+		doc.set_pattern("name", name);
+		doc.set_pattern("name", pat);
+
+		assert_eq!(doc.compile(), String::from("-one--two-"))
+	}
 }

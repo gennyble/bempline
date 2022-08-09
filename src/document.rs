@@ -17,6 +17,7 @@ pub struct Document {
 	template_path: Option<PathBuf>,
 	pub(crate) tokens: Vec<Token>,
 	variables: HashMap<String, String>,
+	patterns: HashMap<String, Vec<String>>,
 }
 
 impl Document {
@@ -27,6 +28,7 @@ impl Document {
 			template_path: Some(path.as_ref().to_owned()),
 			tokens: vec![],
 			variables: HashMap::new(),
+			patterns: HashMap::new(),
 		};
 
 		doc.parse_string(std::fs::read_to_string(path.as_ref()).map_err(|ioe| {
@@ -40,11 +42,49 @@ impl Document {
 	/// Clear all set variables as if this document was just parsed.
 	pub fn clear_variables(&mut self) {
 		self.variables.clear();
+		self.patterns.clear();
 	}
 
 	/// Set a variable with the given key to the given value
 	pub fn set<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) {
 		self.variables.insert(key.into(), value.into());
+	}
+
+	/// Get pattern
+	pub fn get_pattern<K: Into<String>>(&self, key: K) -> Option<Document> {
+		let key = key.into();
+
+		self.tokens.iter().find_map(|tok| {
+			if let Token::Pattern {
+				pattern_name,
+				tokens,
+			} = tok
+			{
+				if *pattern_name == key {
+					Some(Document {
+						options: self.options.clone(),
+						template_path: self.template_path.clone(),
+						tokens: tokens.clone(),
+						variables: HashMap::new(),
+						patterns: HashMap::new(),
+					})
+				} else {
+					None
+				}
+			} else {
+				None
+			}
+		})
+	}
+
+	pub fn set_pattern<K: Into<String>>(&mut self, key: K, pattern: Document) {
+		let key = key.into();
+		match self.patterns.get_mut(&key) {
+			Some(pats) => pats.push(pattern.compile()),
+			None => {
+				self.patterns.insert(key, vec![pattern.compile()]);
+			}
+		}
 	}
 
 	/// Compile the document into a string. If you set a value for a variable,
@@ -77,6 +117,13 @@ impl Document {
 					Some(val) if !val.is_empty() => ret.push_str(&self.tokens_to_string(tokens)),
 					_ => (),
 				},
+				Token::Pattern { pattern_name, .. } => {
+					if let Some(pat) = self.patterns.get(&pattern_name) {
+						for compiled_pattern in pat {
+							ret.push_str(compiled_pattern);
+						}
+					}
+				}
 				Token::End => (),
 			}
 		}
@@ -90,6 +137,7 @@ impl Document {
 			template_path,
 			tokens,
 			variables,
+			patterns,
 		} = self.first_pass(raw)?;
 
 		let mut new_tokens = vec![];
@@ -101,6 +149,13 @@ impl Document {
 					current = Some(token);
 				}
 				Some(Token::IfSet { ref mut tokens, .. }) => match token {
+					Token::End => {
+						new_tokens.push(current.unwrap());
+						current = None;
+					}
+					_ => tokens.push(token),
+				},
+				Some(Token::Pattern { ref mut tokens, .. }) => match token {
 					Token::End => {
 						new_tokens.push(current.unwrap());
 						current = None;
@@ -123,10 +178,11 @@ impl Document {
 			template_path,
 			tokens: new_tokens,
 			variables,
+			patterns,
 		})
 	}
 
-	// Does all the parsing and follows includes but does not collapse IfSet
+	// Does all the parsing and follows includes but does not collapse IfSet or Pattern
 	fn first_pass<S: AsRef<str>>(mut self, raw: S) -> Result<Self, ParseError> {
 		let mut current = String::new();
 		let mut chars = raw.as_ref().chars().peekable();
@@ -250,6 +306,14 @@ impl Document {
 
 				Ok(())
 			}
+			"pattern" => {
+				self.tokens.push(Token::Pattern {
+					pattern_name: arguments.into(),
+					tokens: vec![],
+				});
+
+				Ok(())
+			}
 			_ => Err(ParseError::UnknownCommand {
 				command: command.to_owned(),
 			}),
@@ -315,6 +379,7 @@ impl FromStr for Document {
 			template_path: None,
 			tokens: vec![],
 			variables: HashMap::new(),
+			patterns: HashMap::new(),
 		}
 		.parse_string(s)
 	}
@@ -341,6 +406,10 @@ pub enum Token {
 	},
 	IfSet {
 		variable_name: String,
+		tokens: Vec<Token>,
+	},
+	Pattern {
+		pattern_name: String,
 		tokens: Vec<Token>,
 	},
 	End,
