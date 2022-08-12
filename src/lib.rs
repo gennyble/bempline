@@ -221,6 +221,13 @@ mod test {
 	}
 
 	#[test]
+	fn iftest_else() {
+		let doc = Document::from_str("{%if-set donotset}wasset{%else}notset{%end}").unwrap();
+
+		assert_eq!(doc.compile(), "notset");
+	}
+
+	#[test]
 	fn pattern_parse() {
 		let doc = Document::from_str("{%pattern name}blah{variable}lah{%end}").unwrap();
 

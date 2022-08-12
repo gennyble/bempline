@@ -113,8 +113,12 @@ impl Document {
 				Token::IfSet {
 					variable_name,
 					tokens,
-				} => match self.variables.get(&variable_name) {
-					Some(val) if !val.is_empty() => ret.push_str(&self.tokens_to_string(tokens)),
+					else_tokens,
+				} => match (self.variables.get(&variable_name), else_tokens) {
+					(Some(val), _) if !val.is_empty() => {
+						ret.push_str(&self.tokens_to_string(tokens))
+					}
+					(_, Some(else_tokens)) => ret.push_str(&self.tokens_to_string(else_tokens)),
 					_ => (),
 				},
 				Token::Pattern { pattern_name, .. } => {
@@ -124,6 +128,7 @@ impl Document {
 						}
 					}
 				}
+				Token::Else => (),
 				Token::End => (),
 			}
 		}
@@ -148,12 +153,22 @@ impl Document {
 				None => {
 					current = Some(token);
 				}
-				Some(Token::IfSet { ref mut tokens, .. }) => match token {
+				Some(Token::IfSet {
+					ref mut tokens,
+					ref mut else_tokens,
+					..
+				}) => match token {
+					Token::Else => {
+						*else_tokens = Some(vec![]);
+					}
 					Token::End => {
 						new_tokens.push(current.unwrap());
 						current = None;
 					}
-					_ => tokens.push(token),
+					_ => match else_tokens {
+						None => tokens.push(token),
+						Some(tok) => tok.push(token),
+					},
 				},
 				Some(Token::Pattern { ref mut tokens, .. }) => match token {
 					Token::End => {
@@ -277,6 +292,10 @@ impl Document {
 		};
 
 		match command {
+			"else" => {
+				self.tokens.push(Token::Else);
+				return Ok(());
+			}
 			"end" => {
 				self.tokens.push(Token::End);
 				return Ok(());
@@ -302,6 +321,7 @@ impl Document {
 				self.tokens.push(Token::IfSet {
 					variable_name: arguments.into(),
 					tokens: vec![],
+					else_tokens: None,
 				});
 
 				Ok(())
@@ -407,11 +427,13 @@ pub enum Token {
 	IfSet {
 		variable_name: String,
 		tokens: Vec<Token>,
+		else_tokens: Option<Vec<Token>>,
 	},
 	Pattern {
 		pattern_name: String,
 		tokens: Vec<Token>,
 	},
+	Else,
 	End,
 }
 
