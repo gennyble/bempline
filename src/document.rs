@@ -2,7 +2,6 @@ use core::fmt;
 use std::{
 	collections::HashMap,
 	error::Error,
-	fmt::write,
 	io,
 	iter::Peekable,
 	path::{Path, PathBuf},
@@ -136,7 +135,7 @@ impl Document {
 		ret
 	}
 
-	fn parse_string<S: AsRef<str>>(mut self, raw: S) -> Result<Self, ParseError> {
+	fn parse_string<S: AsRef<str>>(self, raw: S) -> Result<Self, ParseError> {
 		let Document {
 			options,
 			template_path,
@@ -222,7 +221,7 @@ impl Document {
 							// We're a command, take everything until the next '}'
 							take_while_chars(&mut chars, |ch| *ch != '}')
 						}
-						Some(ch) => {
+						Some(_ch) => {
 							// We're a variable, no whitespace!
 							take_while_chars(&mut chars, |ch| *ch != '}' && !ch.is_whitespace())
 						}
