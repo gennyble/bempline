@@ -135,6 +135,38 @@ impl Document {
 		ret
 	}
 
+	fn do_command_structuring(
+		mut command: Token,
+		iter: &mut impl Iterator<Item = Token>,
+	) -> Result<Token, ParseError> {
+		loop {
+			let token = match iter.next() {
+				Some(Token::End) => return Ok(command),
+				Some(tok) if tok.is_command() => Self::do_command_structuring(tok, iter)?,
+				Some(tok) => tok,
+				None => return Err(ParseError::UnclosedCommand),
+			};
+
+			match command {
+				Token::IfSet {
+					ref mut tokens,
+					ref mut else_tokens,
+					..
+				} => match token {
+					Token::Else => {
+						*else_tokens = Some(vec![]);
+					}
+					_ => match else_tokens {
+						None => tokens.push(token),
+						Some(tok) => tok.push(token),
+					},
+				},
+				Token::Pattern { ref mut tokens, .. } => tokens.push(token),
+				_ => panic!("how'd that get there?"),
+			}
+		}
+	}
+
 	fn parse_string<S: AsRef<str>>(self, raw: S) -> Result<Self, ParseError> {
 		let Document {
 			options,
@@ -144,53 +176,23 @@ impl Document {
 			patterns,
 		} = self.first_pass(raw)?;
 
-		let mut new_tokens = vec![];
-		let mut current = None;
+		let mut iter = tokens.into_iter();
+		let mut tokens = vec![];
 
-		for token in tokens {
-			match current {
-				None => {
-					current = Some(token);
+		loop {
+			match iter.next() {
+				Some(tok) if tok.is_command() => {
+					tokens.push(Self::do_command_structuring(tok, &mut iter)?)
 				}
-				Some(Token::IfSet {
-					ref mut tokens,
-					ref mut else_tokens,
-					..
-				}) => match token {
-					Token::Else => {
-						*else_tokens = Some(vec![]);
-					}
-					Token::End => {
-						new_tokens.push(current.unwrap());
-						current = None;
-					}
-					_ => match else_tokens {
-						None => tokens.push(token),
-						Some(tok) => tok.push(token),
-					},
-				},
-				Some(Token::Pattern { ref mut tokens, .. }) => match token {
-					Token::End => {
-						new_tokens.push(current.unwrap());
-						current = None;
-					}
-					_ => tokens.push(token),
-				},
-				Some(tok) => {
-					new_tokens.push(tok);
-					current = Some(token);
-				}
+				Some(tok) => tokens.push(tok),
+				None => break,
 			}
-		}
-
-		if let Some(tok) = current {
-			new_tokens.push(tok);
 		}
 
 		Ok(Self {
 			options,
 			template_path,
-			tokens: new_tokens,
+			tokens,
 			variables,
 			patterns,
 		})
@@ -436,6 +438,19 @@ pub enum Token {
 	End,
 }
 
+impl Token {
+	pub fn is_command(&self) -> bool {
+		match self {
+			Token::Text(_) => false,
+			Token::Variable { .. } => false,
+			Token::IfSet { .. } => true,
+			Token::Pattern { .. } => true,
+			Token::Else => false,
+			Token::End => false,
+		}
+	}
+}
+
 #[derive(Debug)]
 pub enum ParseError {
 	ReadError {
@@ -458,6 +473,7 @@ pub enum ParseError {
 		include_path: PathBuf,
 		from_buffer_template: bool,
 	},
+	UnclosedCommand,
 }
 
 impl Error for ParseError {}
@@ -506,6 +522,8 @@ impl fmt::Display for ParseError {
 					)
 				}
 			}
+			//FIXME: gen- this isn't cute, write a real error
+			Self::UnclosedCommand => write!(f, "No end in sight.."),
 		}
 	}
 }
