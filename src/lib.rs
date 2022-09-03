@@ -258,4 +258,20 @@ mod test {
 
 		assert_eq!(doc.compile(), String::from("-one--two-"))
 	}
+
+	#[test]
+	fn nested_scoped_commands() {
+		let mut doc = Document::from_str("{%pattern name}{%if-set var}{%end}{%end}").unwrap();
+		assert_eq!(
+			doc.tokens,
+			vec![Token::Pattern {
+				pattern_name: String::from("name"),
+				tokens: vec![Token::IfSet {
+					variable_name: String::from("var"),
+					tokens: vec![],
+					else_tokens: None
+				}]
+			}]
+		)
+	}
 }
