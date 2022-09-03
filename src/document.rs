@@ -64,7 +64,7 @@ impl Document {
 						options: self.options.clone(),
 						template_path: self.template_path.clone(),
 						tokens: tokens.clone(),
-						variables: HashMap::new(),
+						variables: self.variables.clone(),
 						patterns: HashMap::new(),
 					})
 				} else {
