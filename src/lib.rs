@@ -32,7 +32,7 @@
 //! ```
 
 mod document;
-mod options;
+pub mod options;
 
 pub use document::Document;
 pub use document::Token;
@@ -43,11 +43,15 @@ mod test {
 	use crate::options::IncludeMethod;
 
 	use super::*;
-	use std::{path::PathBuf, str::FromStr};
+	use std::path::PathBuf;
 
 	#[test]
 	fn compile_all_set() {
-		let mut doc = Document::from_str("One: {one} | Two: {two} | Three: {three}").unwrap();
+		let mut doc = Document::from_str(
+			"One: {one} | Two: {two} | Three: {three}",
+			Options::default(),
+		)
+		.unwrap();
 		doc.set("one", "1");
 		doc.set("two", "2");
 		doc.set("three", "3");
@@ -57,7 +61,11 @@ mod test {
 
 	#[test]
 	fn compile_some_set() {
-		let mut doc = Document::from_str("One: {one} | Two: {two} | Three: {three}").unwrap();
+		let mut doc = Document::from_str(
+			"One: {one} | Two: {two} | Three: {three}",
+			Options::default(),
+		)
+		.unwrap();
 		doc.set("one", "1");
 		doc.set("three", "3");
 
@@ -68,13 +76,13 @@ mod test {
 
 	#[test]
 	fn no_text() {
-		let doc = Document::from_str("").unwrap();
+		let doc = Document::from_str("", Options::default()).unwrap();
 		assert_eq!(doc.tokens, vec![]);
 	}
 
 	#[test]
 	fn only_text() {
-		let doc = Document::from_str("Nothing but text").unwrap();
+		let doc = Document::from_str("Nothing but text", Options::default()).unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![Token::Text(String::from("Nothing but text"))]
@@ -83,7 +91,8 @@ mod test {
 
 	#[test]
 	fn escaped_bracket() {
-		let doc = Document::from_str("escape this: \\{, but not this \\n").unwrap();
+		let doc =
+			Document::from_str("escape this: \\{, but not this \\n", Options::default()).unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![Token::Text(String::from(
@@ -94,7 +103,7 @@ mod test {
 
 	#[test]
 	fn only_variable() {
-		let doc = Document::from_str("{variable}").unwrap();
+		let doc = Document::from_str("{variable}", Options::default()).unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![Token::Variable {
@@ -105,7 +114,7 @@ mod test {
 
 	#[test]
 	fn sandwhiched_variable() {
-		let doc = Document::from_str("Hello {name}, how are you?").unwrap();
+		let doc = Document::from_str("Hello {name}, how are you?", Options::default()).unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![
@@ -120,7 +129,7 @@ mod test {
 
 	#[test]
 	fn ends_variable() {
-		let doc = Document::from_str("Hello {name}").unwrap();
+		let doc = Document::from_str("Hello {name}", Options::default()).unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![
@@ -134,7 +143,7 @@ mod test {
 
 	#[test]
 	fn starts_variable() {
-		let doc = Document::from_str("{name}, hello!").unwrap();
+		let doc = Document::from_str("{name}, hello!", Options::default()).unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![
@@ -148,7 +157,11 @@ mod test {
 
 	#[test]
 	fn multivariable() {
-		let doc = Document::from_str("The weather is {weather} in {location} today.").unwrap();
+		let doc = Document::from_str(
+			"The weather is {weather} in {location} today.",
+			Options::default(),
+		)
+		.unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![
@@ -204,7 +217,7 @@ mod test {
 
 	#[test]
 	fn ifset_variable_set() {
-		let mut doc = Document::from_str("{%if-set foo}set!{%end}").unwrap();
+		let mut doc = Document::from_str("{%if-set foo}set!{%end}", Options::default()).unwrap();
 		doc.set("foo", "bar");
 
 		assert_eq!(doc.compile(), "set!")
@@ -212,8 +225,11 @@ mod test {
 
 	#[test]
 	fn ifset_variable_set_empty_string() {
-		let mut doc =
-			Document::from_str("{%if-set foo}set!{%end}{%if-set bar}barset!{%end}").unwrap();
+		let mut doc = Document::from_str(
+			"{%if-set foo}set!{%end}{%if-set bar}barset!{%end}",
+			Options::default(),
+		)
+		.unwrap();
 		doc.set("foo", "");
 		doc.set("bar", "set!");
 
@@ -222,14 +238,19 @@ mod test {
 
 	#[test]
 	fn iftest_else() {
-		let doc = Document::from_str("{%if-set donotset}wasset{%else}notset{%end}").unwrap();
+		let doc = Document::from_str(
+			"{%if-set donotset}wasset{%else}notset{%end}",
+			Options::default(),
+		)
+		.unwrap();
 
 		assert_eq!(doc.compile(), "notset");
 	}
 
 	#[test]
 	fn pattern_parse() {
-		let doc = Document::from_str("{%pattern name}blah{variable}lah{%end}").unwrap();
+		let doc = Document::from_str("{%pattern name}blah{variable}lah{%end}", Options::default())
+			.unwrap();
 
 		assert_eq!(
 			doc.get_pattern("name").unwrap().tokens,
@@ -245,7 +266,8 @@ mod test {
 
 	#[test]
 	fn pattern_fill() {
-		let mut doc = Document::from_str("{%pattern name}-{variable}-{%end}").unwrap();
+		let mut doc =
+			Document::from_str("{%pattern name}-{variable}-{%end}", Options::default()).unwrap();
 
 		let mut pat = doc.get_pattern("name").unwrap();
 
@@ -261,7 +283,11 @@ mod test {
 
 	#[test]
 	fn nested_scoped_commands() {
-		let mut doc = Document::from_str("{%pattern name}{%if-set var}{%end}{%end}").unwrap();
+		let doc = Document::from_str(
+			"{%pattern name}{%if-set var}{%end}{%end}",
+			Options::default(),
+		)
+		.unwrap();
 		assert_eq!(
 			doc.tokens,
 			vec![Token::Pattern {
