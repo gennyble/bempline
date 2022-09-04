@@ -38,6 +38,17 @@ impl Document {
 		})?)
 	}
 
+	pub fn from_str<S: AsRef<str>>(s: S, options: Options) -> Result<Self, ParseError> {
+		Document {
+			options,
+			template_path: None,
+			tokens: vec![],
+			variables: HashMap::new(),
+			patterns: HashMap::new(),
+		}
+		.parse_string(s)
+	}
+
 	/// Clear all set variables as if this document was just parsed.
 	pub fn clear_variables(&mut self) {
 		self.variables.clear();
@@ -395,14 +406,7 @@ impl FromStr for Document {
 	type Err = ParseError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Document {
-			options: Options::default(),
-			template_path: None,
-			tokens: vec![],
-			variables: HashMap::new(),
-			patterns: HashMap::new(),
-		}
-		.parse_string(s)
+		Self::from_str(s, Options::default())
 	}
 }
 
