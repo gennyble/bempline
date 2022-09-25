@@ -216,6 +216,25 @@ mod test {
 	}
 
 	#[test]
+	fn complex_include() {
+		let doc =
+			Document::from_file("test/pattern_include_ifset_base.bpl", Options::default()).unwrap();
+		assert_eq!(
+			doc.tokens,
+			vec![Token::Pattern {
+				pattern_name: String::from("name"),
+				tokens: vec![Token::IfSet {
+					variable_name: String::from("variable"),
+					tokens: vec![Token::Variable {
+						name: String::from("variable")
+					}],
+					else_tokens: None
+				}]
+			}]
+		)
+	}
+
+	#[test]
 	fn ifset_variable_set() {
 		let mut doc = Document::from_str("{%if-set foo}set!{%end}", Options::default()).unwrap();
 		doc.set("foo", "bar");
