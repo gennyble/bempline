@@ -30,12 +30,14 @@ impl Document {
 			patterns: HashMap::new(),
 		};
 
-		doc.parse_string(std::fs::read_to_string(path.as_ref()).map_err(|ioe| {
-			ParseError::ReadError {
-				inner: ioe,
-				file: path.as_ref().to_owned(),
-			}
-		})?)
+		doc.parse_string(Self::read_to_string(path)?)
+	}
+
+	fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String, ParseError> {
+		std::fs::read_to_string(path.as_ref()).map_err(|ioe| ParseError::ReadError {
+			inner: ioe,
+			file: path.as_ref().to_owned(),
+		})
 	}
 
 	pub fn from_str<S: AsRef<str>>(s: S, options: Options) -> Result<Self, ParseError> {
@@ -178,14 +180,16 @@ impl Document {
 		}
 	}
 
-	fn parse_string<S: AsRef<str>>(self, raw: S) -> Result<Self, ParseError> {
+	fn parse_string<S: AsRef<str>>(mut self, raw: S) -> Result<Self, ParseError> {
+		self.first_pass(raw)?;
+
 		let Document {
 			options,
 			template_path,
 			tokens,
 			variables,
 			patterns,
-		} = self.first_pass(raw)?;
+		} = self;
 
 		let mut iter = tokens.into_iter();
 		let mut tokens = vec![];
@@ -210,7 +214,7 @@ impl Document {
 	}
 
 	// Does all the parsing and follows includes but does not collapse IfSet or Pattern
-	fn first_pass<S: AsRef<str>>(mut self, raw: S) -> Result<Self, ParseError> {
+	fn first_pass<S: AsRef<str>>(&mut self, raw: S) -> Result<(), ParseError> {
 		let mut current = String::new();
 		let mut chars = raw.as_ref().chars().peekable();
 		loop {
@@ -269,7 +273,7 @@ impl Document {
 						self.tokens.push(Token::Text(current));
 					}
 
-					break Ok(self);
+					break Ok(());
 				}
 			}
 		}
@@ -325,8 +329,8 @@ impl Document {
 		match command {
 			"include" => {
 				let resolved = self.resolve_include_path(arguments)?;
-				let doc = Document::from_file(resolved, self.options.clone())?;
-				self.tokens.extend_from_slice(&doc.tokens);
+				let string = Self::read_to_string(resolved)?;
+				self.first_pass(string)?;
 				Ok(())
 			}
 			"if-set" => {

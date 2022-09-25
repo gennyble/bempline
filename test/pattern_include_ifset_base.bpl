@@ -1,0 +1,1 @@
+{%pattern name}{%include pattern_include_ifset_included.bpl}{%end}

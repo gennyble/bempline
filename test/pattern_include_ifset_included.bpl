@@ -1,0 +1,1 @@
+{%if-set variable}{variable}{%end}
