@@ -58,8 +58,8 @@ impl Document {
 	}
 
 	/// Set a variable with the given key to the given value
-	pub fn set<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) {
-		self.variables.insert(key.into(), value.into());
+	pub fn set<K: Into<String>, V: fmt::Display>(&mut self, key: K, value: V) {
+		self.variables.insert(key.into(), format!("{}", value));
 	}
 
 	/// Get pattern
