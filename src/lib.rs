@@ -38,6 +38,25 @@ pub use document::Document;
 pub use document::Token;
 pub use options::Options;
 
+#[macro_export]
+macro_rules! variables {
+	($template:expr, $variable:ident) => {
+		$template.set(stringify!($variable), $variable);
+	};
+
+	($template:expr, $variable:ident, $($variables:ident),+) => {
+		variables!($template, $variable);
+		variables!($template, $($variables),+)
+	}
+}
+
+#[macro_export]
+macro_rules! set {
+	($template:expr, $key:ident, $($arg:tt)*) => {
+		$template.set(stringify!($key), std::fmt::format(format_args!($($arg)*)));
+	};
+}
+
 #[cfg(test)]
 mod test {
 	use crate::options::IncludeMethod;
@@ -318,5 +337,25 @@ mod test {
 				}]
 			}]
 		)
+	}
+
+	#[test]
+	fn variables_macro() {
+		let mut doc = Document::from_str("{foo} and {bar}", Options::default()).unwrap();
+		let foo = "one";
+		let bar = "two";
+
+		variables!(doc, foo, bar);
+
+		assert_eq!(doc.compile(), String::from("one and two"))
+	}
+
+	#[test]
+	fn set_macro() {
+		let mut doc = Document::from_str("{foo}", Options::default()).unwrap();
+
+		set!(doc, foo, "{:X}", 17);
+
+		assert_eq!(doc.compile(), String::from("11"))
 	}
 }
