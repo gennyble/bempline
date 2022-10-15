@@ -361,8 +361,9 @@ mod test {
 
 	#[test]
 	fn wrapping_include() {
-		let expected = "<html><head><title>Test!</title></head></html>";
-		let doc = Document::from_file("test/wrapped_include.bpl", Options::default()).unwrap();
+		let expected = "<html><head>Foo<title>Test!</title></head></html>";
+		let mut doc = Document::from_file("test/wrapped_include.bpl", Options::default()).unwrap();
+		doc.set("var_in", "Foo");
 
 		assert_eq!(doc.compile(), expected)
 	}

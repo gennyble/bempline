@@ -1,1 +1,1 @@
-<head>{wrapped-content}</head>
+<head>{var_in}{wrapped-content}</head>
