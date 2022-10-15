@@ -140,15 +140,8 @@ impl Document {
 						}
 					}
 				}
-				Token::WrapInclude {
-					mut document,
-					tokens,
-				} => {
-					let inner = self.tokens_to_string(tokens);
-					document.variables = self.variables.clone();
-					document.set("wrapped-content", inner);
-					ret.push_str(&document.compile());
-				}
+				Token::WrapInclude { .. } => (),
+				Token::WrappedContent => (),
 				Token::Else => (),
 				Token::End => (),
 			}
@@ -185,7 +178,11 @@ impl Document {
 				},
 				Token::Pattern { ref mut tokens, .. } => tokens.push(token),
 				Token::WrapInclude { ref mut tokens, .. } => tokens.push(token),
-				Token::Text(_) | Token::Variable { .. } | Token::Else | Token::End => {
+				Token::Text(_)
+				| Token::Variable { .. }
+				| Token::WrappedContent
+				| Token::Else
+				| Token::End => {
 					panic!("Should not be able to get here!")
 				}
 			}
@@ -204,14 +201,32 @@ impl Document {
 		} = self;
 
 		let mut iter = tokens.into_iter();
-		let mut tokens = vec![];
+		let mut doc_tokens = vec![];
 
 		loop {
 			match iter.next() {
-				Some(tok) if tok.is_command() => {
-					tokens.push(Self::do_command_structuring(tok, &mut iter)?)
+				Some(Token::WrapInclude { document, tokens }) => {
+					let wrap = Token::WrapInclude { document, tokens };
+					let wrap = Self::do_command_structuring(wrap, &mut iter)?;
+
+					let (doc, mut toks) = if let Token::WrapInclude { document, tokens } = wrap {
+						(document.tokens.into_iter(), tokens)
+					} else {
+						unreachable!()
+					};
+
+					for tok in doc {
+						if let Token::WrappedContent = tok {
+							doc_tokens.extend(toks.drain(..));
+						} else {
+							doc_tokens.push(tok);
+						}
+					}
 				}
-				Some(tok) => tokens.push(tok),
+				Some(tok) if tok.is_command() => {
+					doc_tokens.push(Self::do_command_structuring(tok, &mut iter)?)
+				}
+				Some(tok) => doc_tokens.push(tok),
 				None => break,
 			}
 		}
@@ -219,7 +234,7 @@ impl Document {
 		Ok(Self {
 			options,
 			template_path,
-			tokens,
+			tokens: doc_tokens,
 			variables,
 			patterns,
 		})
@@ -326,6 +341,10 @@ impl Document {
 			}
 			"end" => {
 				self.tokens.push(Token::End);
+				return Ok(());
+			}
+			"wrapped-content" => {
+				self.tokens.push(Token::WrappedContent);
 				return Ok(());
 			}
 			_ => (),
@@ -470,6 +489,7 @@ pub enum Token {
 		document: Document,
 		tokens: Vec<Token>,
 	},
+	WrappedContent,
 	Else,
 	End,
 }
@@ -482,6 +502,7 @@ impl Token {
 			Token::IfSet { .. } => true,
 			Token::Pattern { .. } => true,
 			Token::WrapInclude { .. } => true,
+			Token::WrappedContent => false,
 			Token::Else => false,
 			Token::End => false,
 		}
