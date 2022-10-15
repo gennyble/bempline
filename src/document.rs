@@ -10,7 +10,7 @@ use std::{
 
 use crate::{options::IncludeMethod, Options};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Document {
 	options: Options,
 	template_path: Option<PathBuf>,
@@ -140,6 +140,14 @@ impl Document {
 						}
 					}
 				}
+				Token::WrapInclude {
+					mut document,
+					tokens,
+				} => {
+					let inner = self.tokens_to_string(tokens);
+					document.set("wrapped-content", inner);
+					ret.push_str(&document.compile());
+				}
 				Token::Else => (),
 				Token::End => (),
 			}
@@ -175,7 +183,10 @@ impl Document {
 					},
 				},
 				Token::Pattern { ref mut tokens, .. } => tokens.push(token),
-				_ => panic!("how'd that get there?"),
+				Token::WrapInclude { ref mut tokens, .. } => tokens.push(token),
+				Token::Text(_) | Token::Variable { .. } | Token::Else | Token::End => {
+					panic!("Should not be able to get here!")
+				}
 			}
 		}
 	}
@@ -350,6 +361,18 @@ impl Document {
 
 				Ok(())
 			}
+			"wrap-include" => {
+				let resolved = self.resolve_include_path(arguments)?;
+				let string = Self::read_to_string(resolved)?;
+				let doc = Document::from_str(&string, self.options.clone())?;
+
+				self.tokens.push(Token::WrapInclude {
+					document: doc,
+					tokens: vec![],
+				});
+
+				Ok(())
+			}
 			_ => Err(ParseError::UnknownCommand {
 				command: command.to_owned(),
 			}),
@@ -442,6 +465,10 @@ pub enum Token {
 		pattern_name: String,
 		tokens: Vec<Token>,
 	},
+	WrapInclude {
+		document: Document,
+		tokens: Vec<Token>,
+	},
 	Else,
 	End,
 }
@@ -453,6 +480,7 @@ impl Token {
 			Token::Variable { .. } => false,
 			Token::IfSet { .. } => true,
 			Token::Pattern { .. } => true,
+			Token::WrapInclude { .. } => true,
 			Token::Else => false,
 			Token::End => false,
 		}

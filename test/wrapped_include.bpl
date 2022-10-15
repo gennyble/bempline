@@ -1,0 +1,1 @@
+<html>{%wrap-include wrapping_include.bpl}<title>Test!</title>{%end}</html>
