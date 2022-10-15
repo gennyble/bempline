@@ -145,6 +145,7 @@ impl Document {
 					tokens,
 				} => {
 					let inner = self.tokens_to_string(tokens);
+					document.variables = self.variables.clone();
 					document.set("wrapped-content", inner);
 					ret.push_str(&document.compile());
 				}
