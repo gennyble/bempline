@@ -358,4 +358,12 @@ mod test {
 
 		assert_eq!(doc.compile(), String::from("11"))
 	}
+
+	#[test]
+	fn wrapping_include() {
+		let expected = "<html><head><title>Test!</title></head></html>";
+		let doc = Document::from_file("test/wrapped_include.bpl", Options::default()).unwrap();
+
+		assert_eq!(doc.compile(), expected)
+	}
 }

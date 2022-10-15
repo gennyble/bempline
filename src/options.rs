@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Options {
 	pub unknown_include: ErrorLevel,
 	pub unset_varaible: ErrorLevel,
