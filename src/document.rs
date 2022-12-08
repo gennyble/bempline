@@ -358,6 +358,13 @@ impl Document {
 
 		// Reaching here means we have arguments and they are not an empty string
 		match command {
+			"set" => match arguments.split_once(" ") {
+				None => return invalid_arguments(),
+				Some((name, value)) => {
+					self.variables.insert(name.to_owned(), value.to_owned());
+					Ok(())
+				}
+			},
 			"include" => {
 				let resolved = self.resolve_include_path(arguments)?;
 				let string = Self::read_to_string(resolved)?;
