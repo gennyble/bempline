@@ -1,0 +1,1 @@
+<html>{%wrap-include wrapping_include.bpl}{%set var_in foo}bar{%end}</html>
