@@ -367,4 +367,12 @@ mod test {
 
 		assert_eq!(doc.compile(), expected)
 	}
+
+	#[test]
+	fn set_command() {
+		let expected = "foo";
+		let doc = Document::from_file("test/set-command.bpl", Options::default()).unwrap();
+
+		assert_eq!(doc.compile(), expected)
+	}
 }
