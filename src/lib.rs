@@ -375,4 +375,12 @@ mod test {
 
 		assert_eq!(doc.compile(), expected)
 	}
+
+	#[test]
+	fn wrapping_set() {
+		let expected = "<html><head>foobar</head></html>";
+		let doc = Document::from_file("test/wrapping_set.bpl", Options::default()).unwrap();
+
+		assert_eq!(doc.compile(), expected)
+	}
 }
