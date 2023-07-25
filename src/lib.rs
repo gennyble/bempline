@@ -35,6 +35,7 @@ mod document;
 pub mod options;
 
 pub use document::Document;
+pub use document::ParseError;
 pub use document::Token;
 pub use options::Options;
 
