@@ -4,6 +4,7 @@ use std::{
 	error::Error,
 	io,
 	iter::Peekable,
+	ops::{Deref, DerefMut},
 	path::{Path, PathBuf},
 	str::{Chars, FromStr},
 };
@@ -63,7 +64,7 @@ impl Document {
 	}
 
 	/// Get pattern
-	pub fn get_pattern<K: Into<String>>(&self, key: K) -> Option<Document> {
+	pub fn get_pattern<K: Into<String>>(&self, key: K) -> Option<Pattern> {
 		let key = key.into();
 
 		self.tokens.iter().find_map(|tok| {
@@ -73,12 +74,15 @@ impl Document {
 			} = tok
 			{
 				if *pattern_name == key {
-					Some(Document {
-						options: self.options.clone(),
-						template_path: self.template_path.clone(),
-						tokens: tokens.clone(),
-						variables: self.variables.clone(),
-						patterns: HashMap::new(),
+					Some(Pattern {
+						name: key.clone(),
+						document: Document {
+							options: self.options.clone(),
+							template_path: self.template_path.clone(),
+							tokens: tokens.clone(),
+							variables: self.variables.clone(),
+							patterns: HashMap::new(),
+						},
 					})
 				} else {
 					None
@@ -89,12 +93,11 @@ impl Document {
 		})
 	}
 
-	pub fn set_pattern<K: Into<String>>(&mut self, key: K, pattern: Document) {
-		let key = key.into();
-		match self.patterns.get_mut(&key) {
-			Some(pats) => pats.push(pattern.compile()),
+	pub fn set_pattern(&mut self, Pattern { name, document }: Pattern) {
+		match self.patterns.get_mut(&name) {
+			Some(pats) => pats.push(document.compile()),
 			None => {
-				self.patterns.insert(key, vec![pattern.compile()]);
+				self.patterns.insert(name, vec![document.compile()]);
 			}
 		}
 	}
@@ -513,6 +516,32 @@ impl Token {
 			Token::Else => false,
 			Token::End => false,
 		}
+	}
+}
+
+#[derive(Clone, Debug)]
+pub struct Pattern {
+	name: String,
+	pub document: Document,
+}
+
+impl Pattern {
+	pub fn name(&self) -> &str {
+		&self.name
+	}
+}
+
+impl Deref for Pattern {
+	type Target = Document;
+
+	fn deref(&self) -> &Self::Target {
+		&self.document
+	}
+}
+
+impl DerefMut for Pattern {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.document
 	}
 }
 

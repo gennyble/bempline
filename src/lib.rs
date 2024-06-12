@@ -314,8 +314,8 @@ mod test {
 		name.set("variable", "one");
 		pat.set("variable", "two");
 
-		doc.set_pattern("name", name);
-		doc.set_pattern("name", pat);
+		doc.set_pattern(name);
+		doc.set_pattern(pat);
 
 		assert_eq!(doc.compile(), String::from("-one--two-"))
 	}
