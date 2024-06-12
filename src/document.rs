@@ -519,6 +519,8 @@ impl Token {
 	}
 }
 
+/// A loose container over a [Document]. This struct is just the [Document]
+/// inside the pattern and the name itself.
 #[derive(Clone, Debug)]
 pub struct Pattern {
 	name: String,
@@ -526,8 +528,18 @@ pub struct Pattern {
 }
 
 impl Pattern {
+	pub fn new(name: String, document: Document) -> Self {
+		Self { name, document }
+	}
+
 	pub fn name(&self) -> &str {
 		&self.name
+	}
+
+	/// Changes the name of this pattern which determines where it is placed in
+	/// the [Document] when [Document::set_pattern] is called.
+	pub fn set_name(&mut self, name: String) {
+		self.name = name;
 	}
 }
 
