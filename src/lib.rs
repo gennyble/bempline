@@ -45,10 +45,22 @@ macro_rules! variables {
 		$template.set(stringify!($variable), $variable);
 	};
 
-	($template:expr, $variable:ident, $($variables:ident),+) => {
-		variables!($template, $variable);
-		variables!($template, $($variables),+)
-	}
+	($template:expr, $key:literal = $variable:expr) => {
+		$template.set($key, $variable);
+	};
+
+	($template:expr, $variable:ident, $($arg:tt)*) => {
+		$template.set(stringify!($variable), $variable);
+		variables!($template, $($arg)*);
+	};
+
+	($template:expr, $key:literal = $variable:expr, $($arg:tt)*) => {
+		$template.set($key, $variable);
+		variables!($template, $($arg)*);
+	}; /*($template:expr, $variable:ident, $($variables:ident),+) => {
+		   variables!($template, $variable);
+		   variables!($template, $($variables),+)
+	   }*/
 }
 
 #[macro_export]
@@ -56,6 +68,15 @@ macro_rules! set {
 	($template:expr, $key:ident, $($arg:tt)*) => {
 		$template.set(stringify!($key), std::fmt::format(format_args!($($arg)*)));
 	};
+}
+
+#[macro_export]
+macro_rules! pattern {
+	($document:expr, $pattern:literal, $($arg:tt)*) => {{
+		let mut pattern = $document.get_pattern($pattern).unwrap();
+		variables!(pattern, $($arg)*);
+		$document.set_pattern(pattern);
+	}};
 }
 
 #[cfg(test)]
@@ -342,13 +363,14 @@ mod test {
 
 	#[test]
 	fn variables_macro() {
-		let mut doc = Document::from_str("{foo} and {bar}", Options::default()).unwrap();
+		let mut doc = Document::from_str("{foo} and {bar} or {baz}", Options::default()).unwrap();
 		let foo = "one";
 		let bar = "two";
+		let ident = "three";
 
-		variables!(doc, foo, bar);
+		variables!(doc, foo, bar, "baz" = ident);
 
-		assert_eq!(doc.compile(), String::from("one and two"))
+		assert_eq!(doc.compile(), String::from("one and two or three"))
 	}
 
 	#[test]
@@ -358,6 +380,19 @@ mod test {
 		set!(doc, foo, "{:X}", 17);
 
 		assert_eq!(doc.compile(), String::from("11"))
+	}
+
+	#[test]
+	fn pattern_macro() {
+		let mut doc =
+			Document::from_str("{%pattern bar}{foo}-{num}! {%end}", Options::default()).unwrap();
+
+		let foos = ["bark", "woof", "ruff"];
+		for (idx, foo) in foos.iter().enumerate() {
+			pattern!(doc, "bar", foo, "num" = idx);
+		}
+
+		assert_eq!(doc.compile(), String::from("bark-0! woof-1! ruff-2! "))
 	}
 
 	#[test]
